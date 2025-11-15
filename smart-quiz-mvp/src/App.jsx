@@ -520,6 +520,19 @@ function App() {
         category = `PDF: ${pdfFile.name}`;
         sourceText = await extractPdfFromServer(pdfFile);
 
+        console.log(
+  "EXTRACTED SOURCE TEXT (first 1000 chars):",
+  sourceText ? sourceText.slice(0, 1000) : "[empty]"
+);
+
+// If text is too small, prevent garbage quiz generation
+if (!sourceText || sourceText.trim().length < 150) {
+  setError("The uploaded PDF does not contain readable text. Try another PDF.");
+  setLoading(false);
+  return;
+}
+
+
       } else if (quizSource === 'youtube') {
         if (!youtubeUrl) throw new Error("Please paste a YouTube URL.");
         category = `YouTube: ${youtubeUrl.substring(0, 60)}...`;

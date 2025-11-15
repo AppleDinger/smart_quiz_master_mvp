@@ -16,6 +16,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+/* ⭐⭐ ADD THESE TWO LINES HERE ⭐⭐ */
+const fileUpload = require("express-fileupload");
+app.use(fileUpload({ useTempFiles: false }));
+/* ⭐⭐ END ADDED CODE ⭐⭐ */
+
 // Register extraction route (if you created it earlier)
 try {
   app.use("/api/extract", require("./routes/extract"));

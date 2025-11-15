@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// --- Skill Model Logic (from your backend) ---
-// We moved this simple logic from your backend directly into the frontend.
+// --- Skill Model Logic ---
 const SKILL_INIT_SCORE = 0.5;
 const SKILL_INIT_DAYS = 1;
 const SKILL_EASY_BONUS = 2.0;
@@ -12,26 +11,19 @@ function updateSkill(skillRecord, score) {
   const oldScore = skillRecord?.score || SKILL_INIT_SCORE;
   const oldDays = skillRecord?.intervalDays || SKILL_INIT_DAYS;
   const now = new Date();
-
   let newScore;
   let newDays;
-
   if (score > 0.8) {
-    // Correct
-    newScore = oldScore + (1 - oldScore) * 0.1; // Move 10% closer to 1.0
+    newScore = oldScore + (1 - oldScore) * 0.1;
     newDays = oldDays * SKILL_EASY_BONUS;
   } else if (score < 0.3) {
-    // Incorrect
-    newScore = oldScore - oldScore * 0.1; // Move 10% closer to 0.0
+    newScore = oldScore - oldScore * 0.1;
     newDays = oldDays * SKILL_HARD_PENALTY;
   } else {
-    // Partially correct
     newScore = oldScore;
     newDays = oldDays;
   }
-
   const nextReview = new Date(now.getTime() + newDays * 24 * 60 * 60 * 1000);
-
   return {
     score: newScore,
     intervalDays: newDays,
@@ -40,16 +32,15 @@ function updateSkill(skillRecord, score) {
 }
 
 // --- AI Service Logic ---
-// Initialize the AI client
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("VITE_GEMINI_API_KEY is not defined. Please add it to your .env file.");
 }
 const genAI = new GoogleGenerativeAI(apiKey);
-// New code (More robust model name):
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
 async function generateQuizFromAI(category, difficulty, numQuestions) {
-  console.log(`Generating ${numQuestions} questions...`);
+  console.log(`Generating ${numQuestions} questions for topic: ${category}`);
 
   const prompt = `
     You are a helpful quiz generation assistant.
@@ -87,17 +78,11 @@ async function generateQuizFromAI(category, difficulty, numQuestions) {
     const result = await model.generateContent(prompt);
     const response = result.response;
     let text = response.text();
-
-    // Clean the AI's response
     text = text.replace(/^```json\n/, '').replace(/\n```$/, '');
-    
     const quizData = JSON.parse(text);
-
-    // Add unique IDs
     quizData.questions.forEach((q, index) => {
       q.id = `llm_${Date.now()}_${index + 1}`;
     });
-
     return quizData;
   } catch (error) {
     console.error('Error calling LLM:', error);
@@ -107,6 +92,7 @@ async function generateQuizFromAI(category, difficulty, numQuestions) {
 
 // --- The Main React Component ---
 function App() {
+  // --- STATE ---
   const [page, setPage] = useState('home'); // 'home', 'quiz', 'dashboard'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -116,13 +102,29 @@ function App() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState(null);
   
-  const [skills, setSkills] = useState({}); // This is our in-memory skill database
+  const [skills, setSkills] = useState({});
+  
+  // --- NEW --- state for the custom topic
+  const [customTopic, setCustomTopic] = useState('');
+  
+  // --- NEW --- list of B.Tech categories
+  const BTECH_CATEGORIES = ['OOPS', 'DSA', 'Electronics', 'Fluid Mechanics'];
 
-  const handleStartQuiz = async () => {
+  // --- EVENT HANDLERS ---
+
+  // --- MODIFIED --- to accept a category
+  const handleStartQuiz = async (category) => {
+    // Basic validation
+    if (!category || category.trim() === '') {
+        setError("Please select or enter a topic.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const data = await generateQuizFromAI('General Knowledge', 'medium', 5);
+      // Pass the selected category to the AI function
+      const data = await generateQuizFromAI(category, 'medium', 5);
       setQuizData(data);
       setCurrentQIndex(0);
       setFeedback(null);
@@ -136,18 +138,14 @@ function App() {
 
   const handleSubmitAnswer = () => {
     const question = quizData.questions[currentQIndex];
-    const isCorrect = selectedAnswer.toLowerCase() === question.answer.toLowerCase();
+    const isCorrect = selectedAnswer.toLowerCase().trim() === question.answer.toLowerCase().trim();
     const score = isCorrect ? 1 : 0;
-
-    // Update skills
     const newSkills = { ...skills };
     const qSkills = question.skills || ['general'];
     qSkills.forEach(skillName => {
       newSkills[skillName] = updateSkill(newSkills[skillName], score);
     });
     setSkills(newSkills);
-
-    // Set feedback
     setFeedback({
       score,
       explanation: question.explanation,
@@ -160,37 +158,70 @@ function App() {
       setFeedback(null);
       setSelectedAnswer('');
     } else {
-      // Quiz is over
       setPage('dashboard');
       setQuizData(null);
     }
   };
 
-  // --- Render Functions for Each Page ---
+  // --- RENDER FUNCTIONS ---
 
+  // --- COMPLETELY REWRITTEN --- to show categories
   const renderHomeScreen = () => (
-    <div className="text-center">
-      <h1 className="text-4xl font-bold mb-4">Welcome to Smart Quiz!</h1>
-      <p className="text-lg text-gray-700 mb-8">
-        Test your knowledge with our adaptive AI-powered quizzes.
-      </p>
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-3xl font-bold text-center mb-6">Select a Topic</h1>
       
-      <button
-        onClick={handleStartQuiz}
-        disabled={loading}
-        className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-xl hover:bg-blue-700 disabled:bg-gray-400"
-      >
-        {loading ? 'Generating...' : 'Start a New Quiz'}
-      </button>
+      {/* B.Tech Categories */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h2 className="text-2xl font-semibold mb-4 text-gray-700">B.Tech Subjects</h2>
+        <div className="grid grid-cols-2 gap-4">
+          {BTECH_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleStartQuiz(cat)}
+              disabled={loading}
+              className="w-full text-lg bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom Category */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-semibold mb-4 text-gray-700">Or... Enter a Custom Topic</h2>
+        <p className="text-gray-600 mb-4">Want to learn about World History, Biology, or anything else? Just type it below.</p>
+        <div className="flex gap-4">
+          <input
+            type="text"
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            placeholder="e.g., 'The Roman Empire'"
+            className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+          />
+          <button
+            onClick={() => handleStartQuiz(customTopic)}
+            disabled={loading || !customTopic}
+            className="bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+          >
+            Go
+          </button>
+        </div>
+      </div>
+
+      {loading && (
+        <p className="text-center text-lg text-gray-600 mt-6">Generating your quiz...</p>
+      )}
 
       {error && (
-        <p className="text-red-500 mt-4">
+        <p className="text-center text-red-500 mt-6">
           <strong>Error:</strong> {error.toString()}
         </p>
       )}
     </div>
   );
 
+  // --- UNCHANGED ---
   const renderQuizScreen = () => {
     if (!quizData) return renderHomeScreen(); // Safety check
     const question = quizData.questions[currentQIndex];
@@ -273,6 +304,7 @@ function App() {
     );
   };
 
+  // --- UNCHANGED ---
   const renderDashboardScreen = () => (
     <div>
       <h1 className="text-3xl font-bold mb-6">Your Skill Dashboard</h1>
@@ -317,6 +349,7 @@ function App() {
     </div>
   );
 
+  // --- UNCHANGED ---
   const renderPage = () => {
     if (page === 'home') return renderHomeScreen();
     if (page === 'quiz') return renderQuizScreen();
@@ -324,6 +357,7 @@ function App() {
     return renderHomeScreen();
   };
 
+  // --- UNCHANGED ---
   return (
     <div className="min-h-screen">
       <nav className="bg-white shadow-md">

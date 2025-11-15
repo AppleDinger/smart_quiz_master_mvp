@@ -46,8 +46,8 @@ if (!apiKey) {
   throw new Error("VITE_GEMINI_API_KEY is not defined. Please add it to your .env file.");
 }
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
+// New code (More robust model name):
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 async function generateQuizFromAI(category, difficulty, numQuestions) {
   console.log(`Generating ${numQuestions} questions...`);
 

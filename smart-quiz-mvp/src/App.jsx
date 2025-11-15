@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 // import { jsPDF } from "jspdf"; // NOTE: Removed direct import to fix compilation error. Assuming jsPDF is globally available (new jsPDF()) or loaded via a <script> tag.
+import { jsPDF } from "jspdf";
 
 // --- Configuration ---
 // NOTE: For the MVP, the Gemini API key is assumed to be set up as a 

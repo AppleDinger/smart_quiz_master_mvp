@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { jsPDF } from 'jspdf';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import Leaderboard from './components/Leaderboard';
 
 // --- Config & constants ---
 const BACKEND_BASE = 'http://localhost:4000'; // adjust if your backend runs elsewhere
@@ -82,10 +83,11 @@ async function extractYoutubeFromServer(url) {
 }
 
 // --- Improved LLM quiz generator (grounded + chunking + strict JSON) ---
+// Replace your existing generateQuizFromAI with this improved, relevance-aware version
 async function generateQuizFromAI(
-  category,
-  difficulty,
-  numQuestions,
+  category, 
+  difficulty, 
+  numQuestions, 
   includeDescriptive,
   customContext,
   sourceText = null,
@@ -95,116 +97,79 @@ async function generateQuizFromAI(
     throw new Error("AI Model not initialized. Check VITE_GEMINI_API_KEY.");
   }
 
-  console.log("generateQuizFromAI:", { category, numQuestions, hasSource: !!sourceText });
-  if (sourceText) console.log("sourceText preview:", sourceText.slice(0, 2000));
-
-  function chunkText(text, maxLen = 2000) {
-    const chunks = [];
-    let i = 0;
-    while (i < text.length) {
-      chunks.push(text.slice(i, i + maxLen));
-      i += maxLen;
-    }
-    return chunks;
-  }
-
-  let groundedContext = "";
-  if (sourceText && sourceText.trim()) {
-    const chunks = chunkText(sourceText, 2000);
-    const useChunks = chunks.slice(0, 3); // adjust if you want more coverage
-    groundedContext = useChunks.map((c, idx) => `---SOURCE CHUNK ${idx + 1}---\n${c.trim()}\n---END CHUNK ${idx + 1}---`).join("\n\n");
-  }
-
-  const sourceNote = groundedContext
-    ? `ONLY use the text inside the SOURCE CHUNK blocks below. Do not rely on outside knowledge or hallucinate facts. If an answer is not supported by text, say "NOT IN SOURCE".`
-    : `No source text provided; generate from general knowledge but prefer accuracy.`;
-
   const questionTypeInstructions = includeDescriptive
-    ? `You may include both "mcq" and "short".`
-    : `You MUST ONLY include "mcq".`;
+    ? `Include both MCQ and short-answer questions.`
+    : `Include ONLY MCQs.`;
 
-  const exampleQuestion = {
-    id: "q_example",
-    prompt: "EXAMPLE: short sample prompt",
-    type: includeDescriptive ? "mcq" : "mcq",
-    choices: ["A", "B", "C", "D"],
-    answer: "A",
-    explanation: "Short explanation referencing the source chunk.",
-    sourceQuote: "A short exact quote (<=200 chars) from a SOURCE CHUNK",
-    skills: skillList.length > 0 ? skillList.slice(0, 2) : ["skill1"],
-    difficulty: 0.5
-  };
+  // Build source instruction
+  let sourceInstruction;
+  if (sourceText) {
+    sourceInstruction = `Generate all questions ONLY from this text:\n${sourceText}`;
+  } else if (skillList.length > 0) {
+    sourceInstruction = `Cover ALL of these topics equally: ${skillList.join(", ")}`;
+  } else {
+    sourceInstruction = `Generate questions strictly from the topic "${category}".`;
+  }
+
+  const contextInstruction = customContext
+    ? `Additional focus: ${customContext}`
+    : "";
 
   const prompt = `
-You are an assistant that MUST generate a quiz strictly grounded in the supplied source text.
+You are an expert quiz generator.
 
-${sourceNote}
+${sourceInstruction}
 
-${groundedContext ? groundedContext : "NO SOURCE CHUNKS PROVIDED."}
+${contextInstruction}
 
-${customContext ? `Additional instructions: ${customContext}` : ""}
-
+Difficulty: ${difficulty}
+Question Count: ${numQuestions}
 ${questionTypeInstructions}
 
-Requirements (follow exactly):
-1) Respond with ONLY a single valid JSON object, no extra commentary, no backticks.
-2) Top-level JSON: { "category": string, "difficulty": string, "questions": [ ... ] }
-3) Each question must include:
-   - id, prompt, type ("mcq" or "short"), choices (for mcq), answer, explanation, sourceQuote (exact substring from SOURCE CHUNK), skills, difficulty (0.0-1.0)
-4) If info is NOT present in SOURCE CHUNKS for a question, set prompt: "NOT IN SOURCE", explanation: "NOT IN SOURCE", sourceQuote: "".
-5) Generate exactly ${numQuestions} questions.
-
-Example question object:
-${JSON.stringify(exampleQuestion, null, 2)}
-
-Now generate the JSON quiz following those rules.
-`;
+IMPORTANT:
+Return ONLY valid JSON in this structure:
+{
+  "category": "${category}",
+  "difficulty": "${difficulty}",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "question text",
+      "type": "mcq" | "short",
+      "choices": ["A","B","C","D"],   // only for MCQ
+      "answer": "correct answer",
+      "explanation": "why this is correct",
+      "skills": ["skill1", "skill2"],
+      "difficulty": 0.5
+    }
+  ]
+}
+All questions must be ORIGINAL and fully based on the given topic.
+  `;
 
   try {
     const result = await model.generateContent(prompt);
-    const response = result.response;
-    let text = response.text().trim();
-    text = text.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    let text = result.response.text();
 
-    console.log("LLM raw response (preview):", text.slice(0, 2000));
+    // Clean markdown wrappers
+    text = text.replace(/^```json/i, '').replace(/```$/i, '');
 
-    // attempt to extract a JSON object from any surrounding text
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      text = text.slice(firstBrace, lastBrace + 1);
-    }
+    const quizData = JSON.parse(text);
 
-    let quizData;
-    try {
-      quizData = JSON.parse(text);
-    } catch (err) {
-      console.error("Failed to parse LLM JSON. Raw text:", text);
-      throw new Error("LLM returned invalid JSON. Check console for raw output.");
-    }
-
-    quizData.questions = (quizData.questions || []).slice(0, numQuestions).map((q, idx) => {
-      q.id = q.id || `llm_${Date.now()}_${idx + 1}`;
-      q.type = q.type || 'mcq';
-      q.choices = q.choices || (q.type === 'mcq' ? ['A', 'B', 'C', 'D'] : []);
-      q.answer = q.answer || '';
-      q.explanation = q.explanation || '';
-      q.sourceQuote = (q.sourceQuote || '').slice(0, 400);
-      q.skills = q.skills && q.skills.length ? q.skills : (skillList.length ? skillList.slice(0, 1) : ['general']);
-      q.difficulty = typeof q.difficulty === 'number' ? q.difficulty : 0.5;
-      return q;
+    // Assign IDs
+    quizData.questions.forEach((q, index) => {
+      q.id = `q_${Date.now()}_${index + 1}`;
     });
 
-    return {
-      category: quizData.category || category,
-      difficulty: quizData.difficulty || difficulty,
-      questions: quizData.questions
-    };
+    return quizData;
+
   } catch (error) {
-    console.error("generateQuizFromAI error:", error);
-    throw new Error("Failed to generate quiz from LLM. See console for details.");
+    console.error("AI error:", error);
+    throw new Error("Quiz generation failed. Try again with a simpler topic.");
   }
 }
+
+
 
 // --- Main App component --- //
 function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMultiQuiz }) {
@@ -468,18 +433,34 @@ function App() {
 
   // finish quiz
   const finishQuiz = useCallback(() => {
-    if (quizData) {
-      setLastQuizSummary({
-        category: quizData.category,
-        results: quizResults
-      });
-    }
-    setQuizData(null);
-    setQuizResults([]);
-    setIsQuizTimed(false);
-    setMultiQuizSkills(null);
-    setPage('dashboard');
-  }, [quizData, quizResults]);
+
+  // ⭐ SAVE USER SCORE TO BACKEND
+  if (user && quizResults.length > 0) {
+    fetch("http://localhost:4000/api/save-attempt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: user.username,
+        correct: quizResults.filter(r => r.isCorrect).length,
+        numQuestions: quizResults.length
+      })
+    }).catch(err => console.error("Save attempt failed", err));
+  }
+
+  // EXISTING CODE BELOW — DO NOT CHANGE
+  if (quizData) {
+    setLastQuizSummary({ 
+      category: quizData.category, 
+      results: quizResults 
+    });
+  }
+  setQuizData(null);
+  setQuizResults([]);
+  setIsQuizTimed(false);
+  setMultiQuizSkills(null);
+  setPage('dashboard');
+}, [quizData, quizResults, user]);
+
 
   // Timer effect
   useEffect(() => {
@@ -959,20 +940,34 @@ function App() {
   );
 
   const renderPage = () => {
-    if (!user) return renderLoginScreen();
-    switch (page) {
-      case 'quiz': return renderQuizScreen();
-      case 'dashboard': return renderDashboardScreen();
-      case 'home':
-      default: return renderHomeScreen();
-    }
-  };
+  if (!user) {
+    return renderLoginScreen();
+  }
+  switch (page) {
+    case 'quiz':
+      return renderQuizScreen();
+    case 'dashboard':
+      return renderDashboardScreen();
+
+    // ⭐ ADD THIS CASE ⭐
+    case 'leaderboard':
+      return <Leaderboard onClose={() => setPage('dashboard')} />;
+
+    case 'home':
+    default:
+      return renderHomeScreen();
+  }
+};
+
 
   return (
     <div className="min-h-screen">
       <nav className="bg-white shadow-md">
+        
         <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-3xl">
           <button onClick={() => setPage('home')} className="text-2xl font-bold text-blue-600">🧠 Smart Quiz MVP</button>
+          <button onClick={() => setPage('leaderboard')} className="text-gray-600 hover:text-blue-600">Leaderboard</button>
+
           <div className="flex items-center gap-4">
             {user ? (
               <>

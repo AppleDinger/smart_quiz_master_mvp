@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// --- Skill Model Logic (from your backend) ---
-// We moved this simple logic from your backend directly into the frontend.
+// --- Skill Model Logic ---
 const SKILL_INIT_SCORE = 0.5;
 const SKILL_INIT_DAYS = 1;
 const SKILL_EASY_BONUS = 2.0;
@@ -36,53 +35,61 @@ function updateSkill(skillRecord, score) {
     score: newScore,
     intervalDays: newDays,
     nextReview: nextReview.toISOString(),
-    // We add a 'lastAnswered' timestamp to track quiz activity
     lastAnswered: now.toISOString(),
   };
 }
 
 // --- AI Service Logic ---
-// Initialize the AI client
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("VITE_GEMINI_API_KEY is not defined. Please add it to your .env file.");
 }
 const genAI = new GoogleGenerativeAI(apiKey);
-// **MODIFIED**: Corrected model name from 'gemini-2.5-flash' to 'gemini-1.5-flash'
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-async function generateQuizFromAI(category, difficulty, numQuestions) {
+async function generateQuizFromAI(category, difficulty, numQuestions, includeDescriptive) {
   console.log(`Generating ${numQuestions} questions...`);
 
+  const questionTypeInstructions = includeDescriptive 
+    ? `You can include "mcq" (multiple choice) and "short" (short answer) questions.`
+    : `You MUST ONLY include "mcq" (multiple choice) questions. Do not include "short" answer questions.`;
+
+  const questionExamples = [
+    {
+      "id": "q1",
+      "prompt": "MCQ prompt here...",
+      "type": "mcq",
+      "choices": ["A", "B", "C", "D"],
+      "answer": "The correct answer",
+      "explanation": "A brief explanation of the answer.",
+      "skills": ["skill1", "skill2"],
+      "difficulty": 0.5
+    }
+  ];
+
+  if (includeDescriptive) {
+    questionExamples.push({
+      "id": "q2",
+      "prompt": "Short answer question prompt...",
+      "type": "short",
+      "answer": "The correct answer",
+      "explanation": "A brief explanation.",
+      "skills": ["skill3"],
+      "difficulty": 0.7
+    });
+  }
+  
   const prompt = `
     You are a helpful quiz generation assistant.
     Generate a ${numQuestions}-question quiz about "${category}" with a ${difficulty} difficulty.
     
+    ${questionTypeInstructions}
+
     Respond with ONLY a valid JSON object in the following format:
     {
       "category": "${category}",
       "difficulty": "${difficulty}",
-      "questions": [
-        {
-          "id": "q1",
-          "prompt": "Question prompt here...",
-          "type": "mcq",
-          "choices": ["A", "B", "C", "D"],
-          "answer": "The correct answer",
-          "explanation": "A brief explanation of the answer.",
-          "skills": ["skill1", "skill2"],
-          "difficulty": 0.5
-        },
-        {
-          "id": "q2",
-          "prompt": "Short answer question prompt...",
-          "type": "short",
-          "answer": "The correct answer",
-          "explanation": "A brief explanation.",
-          "skills": ["skill3"],
-          "difficulty": 0.7
-        }
-      ]
+      "questions": ${JSON.stringify(questionExamples, null, 2)}
     }
   `;
 
@@ -91,12 +98,10 @@ async function generateQuizFromAI(category, difficulty, numQuestions) {
     const response = result.response;
     let text = response.text();
 
-    // Clean the AI's response
     text = text.replace(/^```json\n/, '').replace(/\n```$/, '');
     
     const quizData = JSON.parse(text);
 
-    // Add unique IDs
     quizData.questions.forEach((q, index) => {
       q.id = `llm_${Date.now()}_${index + 1}`;
     });
@@ -108,7 +113,7 @@ async function generateQuizFromAI(category, difficulty, numQuestions) {
   }
 }
 
-// --- NEW: B.Tech Subject List ---
+// --- B.Tech Subject List ---
 const BTECH_SUBJECTS = [
   'Data Structures & Algorithms',
   'Operating Systems',
@@ -122,7 +127,7 @@ const BTECH_SUBJECTS = [
   'Software Engineering',
   'Machine Learning',
   'Artificial Intelligence',
-  'WebDevelopment (HTML/CSS/JS)',
+  'Web Development (HTML/CSS/JS)',
   'React.js',
   'Node.js',
   'Calculus & Linear Algebra',
@@ -133,12 +138,18 @@ const BTECH_SUBJECTS = [
   'Custom' // This MUST be the last item
 ];
 
-// --- NEW: Enhanced Dashboard Component ---
-// This component is now used by both the Home screen and the Dashboard screen.
+// --- Enhanced Dashboard Component ---
 function DashboardComponent({ skills }) {
-  const skillEntries = Object.entries(skills);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const skillEntries = Object.entries(skills)
+    .filter(([skillName]) => 
+      skillName.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => a[0].localeCompare(b[0])); // Sort alphabetically
+
   
-  if (skillEntries.length === 0) {
+  if (Object.keys(skills).length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md text-center">
         <h2 className="text-2xl font-semibold mb-4">Your Skill Dashboard</h2>
@@ -147,9 +158,10 @@ function DashboardComponent({ skills }) {
     );
   }
 
-  // Calculate statistics
   const totalSkills = skillEntries.length;
-  const averageScore = skillEntries.reduce((acc, [, data]) => acc + (data.score || 0), 0) / totalSkills;
+  const averageScore = totalSkills > 0 
+    ? skillEntries.reduce((acc, [, data]) => acc + (data.score || 0), 0) / totalSkills
+    : 0;
   
   const strongTopics = skillEntries
     .filter(([, data]) => data.score >= 0.7)
@@ -159,7 +171,6 @@ function DashboardComponent({ skills }) {
     .filter(([, data]) => data.score <= 0.4)
     .sort(([, a], [, b]) => a.score - b.score);
 
-  // Helper to render a list of topics
   const renderTopicList = (title, topics, bgColor) => (
     <div className={`p-4 rounded-lg ${bgColor}`}>
       <h3 className="font-bold text-lg mb-2">{title} ({topics.length})</h3>
@@ -167,7 +178,7 @@ function DashboardComponent({ skills }) {
         <p className="text-sm opacity-70">None yet.</p>
       ) : (
         <ul className="list-disc list-inside space-y-1">
-          {topics.slice(0, 5).map(([name, data]) => ( // Show top 5
+          {topics.slice(0, 5).map(([name, data]) => (
             <li key={name} className="capitalize">
               {name} <span className="text-xs opacity-70">({Math.round(data.score * 100)}%)</span>
             </li>
@@ -182,7 +193,14 @@ function DashboardComponent({ skills }) {
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-semibold mb-4">Your Skill Dashboard</h2>
       
-      {/* Stats Grid */}
+      <input
+        type="text"
+        placeholder="Search skills..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-2 focus:ring-blue-300"
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg text-center">
           <div className="text-4xl font-bold text-blue-700">
@@ -198,14 +216,15 @@ function DashboardComponent({ skills }) {
         </div>
       </div>
       
-      {/* Weak/Strong Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {renderTopicList("💪 Strong Topics", strongTopics, "bg-green-50")}
         {renderTopicList("🧠 Weak Topics", weakTopics, "bg-red-50")}
       </div>
       
-      {/* Detailed Skill Breakdown */}
       <h3 className="text-xl font-semibold mb-4">All Skills Breakdown</h3>
+      {skillEntries.length === 0 && searchTerm && (
+        <p className="text-gray-600 text-center">No skills found matching "{searchTerm}".</p>
+      )}
       <div className="flex flex-wrap gap-4">
         {skillEntries.map(([skillName, skillData]) => {
           const progress = Math.max(0, Math.min(1, skillData.score || 0));
@@ -247,45 +266,118 @@ function App() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState(null);
   
-  const [skills, setSkills] = useState({}); // This is our in-memory skill database
+  const [skills, setSkills] = useState({}); 
 
-  // --- NEW: State for subject selection ---
+  // --- Quiz settings state ---
   const [selectedSubject, setSelectedSubject] = useState(BTECH_SUBJECTS[0]);
   const [customSubject, setCustomSubject] = useState('');
+  const [numQuestions, setNumQuestions] = useState(5);
+  const [includeDescriptive, setIncludeDescriptive] = useState(false);
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerDuration, setTimerDuration] = useState(10); // in minutes
+  
+  // --- In-Quiz timer state ---
+  const [isQuizTimed, setIsQuizTimed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0); // in seconds
 
-  const handleStartQuiz = async () => {
-    // **MODIFIED**: Determine category from dropdown or custom input
+  // Timer countdown logic
+  useEffect(() => {
+    if (page !== 'quiz' || !isQuizTimed || !!feedback) {
+      return; // Don't run timer if not in quiz, not timed, or feedback is shown
+    }
+
+    if (timeLeft <= 0) {
+      setPage('dashboard'); // End quiz when time runs out
+      setIsQuizTimed(false);
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setTimeLeft((prevTime) => prevTime - 1);
+    }, 1000);
+
+    // Cleanup interval on unmount or when quiz page changes
+    return () => clearInterval(intervalId);
+
+  }, [timeLeft, isQuizTimed, page, feedback]); 
+
+  // Helper to format time
+  const formatTime = (totalSeconds) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+
+  const handleStartQuiz = useCallback(async () => {
     const category = selectedSubject === 'Custom' ? customSubject : selectedSubject;
 
     if (!category) {
       setError("Please select a subject or enter a custom topic.");
       return;
     }
+    
+    const questionCount = Math.max(5, Math.min(50, numQuestions));
+    setNumQuestions(questionCount);
 
     setLoading(true);
     setError(null);
     try {
-      // Use the selected category
-      const data = await generateQuizFromAI(category, 'medium', 5);
+      const data = await generateQuizFromAI(category, 'medium', questionCount, includeDescriptive);
       setQuizData(data);
       setCurrentQIndex(0);
       setFeedback(null);
       setSelectedAnswer('');
+
+      if (timerEnabled) {
+        setIsQuizTimed(true);
+        setTimeLeft(timerDuration * 60);
+      } else {
+        setIsQuizTimed(false);
+        setTimeLeft(0);
+      }
+
       setPage('quiz');
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
-  };
+  }, [selectedSubject, customSubject, numQuestions, includeDescriptive, timerEnabled, timerDuration]);
 
-  const handleSubmitAnswer = () => {
+
+  // **MODIFIED**: Wrapped in useCallback for stable keyboard listener
+  const finishQuiz = useCallback(() => {
+    setPage('dashboard');
+    setQuizData(null);
+    setIsQuizTimed(false); // Stop timer when quiz ends
+  }, []);
+
+  // **MODIFIED**: Wrapped in useCallback for stable keyboard listener
+  const handleNextQuestion = useCallback(() => {
+    if (!quizData) return;
+    if (currentQIndex < quizData.questions.length - 1) {
+      setCurrentQIndex(currentQIndex + 1);
+      setFeedback(null);
+      setSelectedAnswer('');
+    } else {
+      // Quiz is over
+      finishQuiz();
+    }
+  }, [currentQIndex, quizData, finishQuiz]);
+
+  // **MODIFIED**: Wrapped in useCallback for stable keyboard listener
+  const handleSubmitAnswer = useCallback(() => {
+    if (!quizData) return;
     const question = quizData.questions[currentQIndex];
     const isCorrect = selectedAnswer.toLowerCase() === question.answer.toLowerCase();
     const score = isCorrect ? 1 : 0;
 
     // Update skills
     const newSkills = { ...skills };
-    const qSkills = question.skills || ['general'];
+    const qSkills = question.skills && question.skills.length > 0 
+      ? question.skills 
+      : [quizData.category.toLowerCase().replace(/&/g, 'and').replace(/\s+/g, '-') || 'general'];
+      
     qSkills.forEach(skillName => {
       newSkills[skillName] = updateSkill(newSkills[skillName], score);
     });
@@ -296,19 +388,52 @@ function App() {
       score,
       explanation: question.explanation,
     });
-  };
+  }, [quizData, currentQIndex, selectedAnswer, skills]);
 
-  const handleNextQuestion = () => {
-    if (currentQIndex < quizData.questions.length - 1) {
-      setCurrentQIndex(currentQIndex + 1);
-      setFeedback(null);
-      setSelectedAnswer('');
-    } else {
-      // Quiz is over
-      setPage('dashboard');
-      setQuizData(null);
-    }
-  };
+
+  // --- NEW: Keyboard navigation effect ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only run on quiz page
+      if (page !== 'quiz' || !quizData) return;
+
+      const question = quizData.questions[currentQIndex];
+      const key = e.key.toLowerCase();
+
+      // --- Handle 'Enter' key ---
+      if (key === 'enter') {
+        e.preventDefault(); // Prevent default form submission
+        if (!!feedback) {
+          // If feedback is showing, move to next question
+          handleNextQuestion();
+        } else if (!feedback && selectedAnswer) {
+          // If no feedback and an answer is selected, submit
+          handleSubmitAnswer();
+        }
+      }
+
+      // --- Handle 'a, b, c, d' keys ---
+      if (!feedback && question.type === 'mcq') {
+        let choiceIndex = -1;
+        if (key === 'a') choiceIndex = 0;
+        else if (key === 'b') choiceIndex = 1;
+        else if (key === 'c') choiceIndex = 2;
+        else if (key === 'd') choiceIndex = 3;
+
+        if (choiceIndex !== -1 && question.choices[choiceIndex]) {
+          setSelectedAnswer(question.choices[choiceIndex]);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [page, feedback, selectedAnswer, quizData, currentQIndex, handleNextQuestion, handleSubmitAnswer]);
+
 
   // --- Render Functions for Each Page ---
 
@@ -316,13 +441,12 @@ function App() {
     <div className="space-y-8">
       <h1 className="text-4xl font-bold text-center">Welcome to Smart Quiz!</h1>
       
-      {/* **NEW**: Dashboard is now on the home page */}
-      <DashboardComponent skills={skills} />
-
-      {/* **NEW**: Quiz selection form */}
+      {/* Quiz selection form */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold mb-4">Start a New Quiz</h2>
         <div className="space-y-4">
+          
+          {/* Subject Dropdown */}
           <div>
             <label htmlFor="subject-select" className="block text-sm font-medium text-gray-700 mb-1">
               Select a Subject
@@ -341,7 +465,7 @@ function App() {
             </select>
           </div>
 
-          {/* **NEW**: Custom subject input */}
+          {/* Custom Subject Input */}
           {selectedSubject === 'Custom' && (
             <div>
               <label htmlFor="custom-subject" className="block text-sm font-medium text-gray-700 mb-1">
@@ -357,7 +481,70 @@ function App() {
               />
             </div>
           )}
+
+          {/* Question Count Input */}
+          <div>
+            <label htmlFor="num-questions" className="block text-sm font-medium text-gray-700 mb-1">
+              Number of Questions (5-50)
+            </label>
+            <input
+              type="number"
+              id="num-questions"
+              value={numQuestions}
+              min="5"
+              max="50"
+              onChange={(e) => setNumQuestions(Math.max(5, Math.min(50, parseInt(e.target.value, 10))))}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          {/* Timer Options */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center">
+              <input
+                id="include-timer"
+                type="checkbox"
+                checked={timerEnabled}
+                onChange={(e) => setTimerEnabled(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="include-timer" className="ml-2 block text-sm text-gray-900">
+                Enable Timer
+              </label>
+            </div>
+            
+            {timerEnabled && (
+              <div className="flex-1 min-w-[150px]">
+                <label htmlFor="timer-duration" className="block text-sm font-medium text-gray-700 mb-1">
+                  Duration (minutes)
+                </label>
+                <input
+                  type="number"
+                  id="timer-duration"
+                  value={timerDuration}
+                  min="1"
+                  onChange={(e) => setTimerDuration(Math.max(1, parseInt(e.target.value, 10)))}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+            )}
+          </div>
           
+          {/* Descriptive Questions Checkbox */}
+          <div className="flex items-center">
+            <input
+              id="include-descriptive"
+              type="checkbox"
+              checked={includeDescriptive}
+              onChange={(e) => setIncludeDescriptive(e.target.checked)}
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="include-descriptive" className="ml-2 block text-sm text-gray-900">
+              Include Descriptive (Short Answer) Questions
+            </label>
+          </div>
+          
+          {/* Start Button */}
           <button
             onClick={handleStartQuiz}
             disabled={loading}
@@ -382,21 +569,30 @@ function App() {
 
     return (
       <div>
-        <h1 className="text-3xl font-bold mb-6">Quiz: {quizData.category}</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold">Quiz: {quizData.category}</h1>
+          {isQuizTimed && (
+            <div className="text-2xl font-bold text-red-600 bg-red-100 px-4 py-2 rounded-lg">
+              {formatTime(timeLeft)}
+            </div>
+          )}
+        </div>
         
         {/* Question Card */}
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold mb-4">{question.prompt}</h2>
+          <h2 className="text-2xl font-semibold mb-4">({currentQIndex + 1}/{quizData.questions.length}) {question.prompt}</h2>
           
           <div className="space-y-3">
             {question.type === 'mcq' ? (
               question.choices.map((choice, index) => {
                 const choiceId = `q_${question.id}_choice_${index}`;
+                // **NEW**: Added key labels
+                const keyLabel = ['A', 'B', 'C', 'D'][index];
                 return (
                   <label 
                     key={choiceId} 
                     htmlFor={choiceId}
-                    className={`block p-4 rounded-lg border cursor-pointer ${
+                    className={`flex items-center p-4 rounded-lg border cursor-pointer ${
                       selectedAnswer === choice 
                         ? 'bg-blue-100 border-blue-500 ring-2 ring-blue-300' 
                         : 'border-gray-300 hover:bg-gray-50'
@@ -410,9 +606,10 @@ function App() {
                       checked={selectedAnswer === choice}
                       onChange={(e) => setSelectedAnswer(e.target.value)}
                       disabled={!!feedback}
-                      className="mr-3"
+                      className="hidden" // Hide radio, label handles click
                     />
-                    {choice}
+                    <span className="mr-3 font-bold text-gray-500">{keyLabel})</span>
+                    <span>{choice}</span>
                   </label>
                 );
               })
@@ -434,7 +631,7 @@ function App() {
               disabled={!selectedAnswer}
               className="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 disabled:bg-gray-400"
             >
-              Submit Answer
+              Submit Answer (Enter)
             </button>
           )}
         </div>
@@ -450,7 +647,19 @@ function App() {
               onClick={handleNextQuestion}
               className="mt-4 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700"
             >
-              {currentQIndex === quizData.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
+              {currentQIndex === quizData.questions.length - 1 ? 'Finish Quiz (Enter)' : 'Next Question (Enter)'}
+            </button>
+          </div>
+        )}
+
+        {/* End Quiz Button */}
+        {!feedback && (
+          <div className="text-center mt-4">
+            <button
+              onClick={finishQuiz}
+              className="text-sm text-gray-500 hover:text-red-600"
+            >
+              End Quiz
             </button>
           </div>
         )}
@@ -458,10 +667,8 @@ function App() {
     );
   };
 
-  // **MODIFIED**: This page now just renders the DashboardComponent
   const renderDashboardScreen = () => (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Your Skill Dashboard</h1>
       <DashboardComponent skills={skills} />
       <button
         onClick={() => setPage('home')}
@@ -482,7 +689,7 @@ function App() {
   return (
     <div className="min-h-screen">
       <nav className="bg-white shadow-md">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center max-w-3xl">
           <button onClick={() => setPage('home')} className="text-2xl font-bold text-blue-600">
             🧠 Smart Quiz MVP
           </button>

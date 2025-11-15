@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { jsPDF } from "jspdf"; // --- NEW: Import jsPDF ---
 
 // --- LOCAL USER DB KEYS ---
 const USERS_DB_KEY = "smartQuizUsers";
@@ -44,7 +45,6 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-// **MODIFIED**: Now accepts customContext and sourceText
 async function generateQuizFromAI(
   category, 
   difficulty, 
@@ -59,7 +59,6 @@ async function generateQuizFromAI(
     ? `You can include "mcq" (multiple choice) and "short" (short answer) questions.`
     : `You MUST ONLY include "mcq" (multiple choice) questions. Do not include "short" answer questions.`;
 
-  // **NEW**: Dynamically build the main prompt instruction
   const sourceInstruction = sourceText
     ? `Generate a ${numQuestions}-question quiz with ${difficulty} difficulty based ONLY on the following provided text:
 ---BEGIN TEXT---
@@ -92,7 +91,6 @@ ${customContext}
     });
   }
   
-  // **MODIFIED**: Assembled new prompt
   const prompt = `
     You are a helpful quiz generation assistant.
     
@@ -138,13 +136,21 @@ const BTECH_SUBJECTS = [
 ];
 
 // --- Dashboard Component ---
-function DashboardComponent({ skills }) {
+// **MODIFIED**: Now accepts lastQuizSummary and onDownloadQuiz
+function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz }) {
   const [searchTerm, setSearchTerm] = useState('');
   const skillEntries = Object.entries(skills)
     .filter(([skillName]) => skillName.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => a[0].localeCompare(b[0]));
 
-  if (Object.keys(skills).length === 0) {
+  // --- NEW: Calculate stats for the last quiz summary ---
+  const lastQuizStats = lastQuizSummary ? lastQuizSummary.results.reduce((acc, result) => {
+    if (result.isCorrect) acc.correct += 1;
+    acc.total += 1;
+    return acc;
+  }, { correct: 0, total: 0 }) : null;
+
+  if (Object.keys(skills).length === 0 && !lastQuizSummary) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md text-center">
         <h2 className="text-2xl font-semibold mb-4">Your Skill Dashboard</h2>
@@ -179,55 +185,89 @@ function DashboardComponent({ skills }) {
   );
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold mb-4">Your Skill Dashboard</h2>
-      <input
-        type="text"
-        placeholder="Search skills..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-2 focus:ring-blue-300"
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-blue-50 p-4 rounded-lg text-center">
-          <div className="text-4xl font-bold text-blue-700">{Math.round(averageScore * 100)}%</div>
-          <div className="text-sm font-medium text-gray-600">Overall Accuracy</div>
-        </div>
-        <div className="bg-indigo-50 p-4 rounded-lg text-center">
-          <div className="text-4xl font-bold text-indigo-700">{totalSkills}</div>
-          <div className="text-sm font-medium text-gray-600">Skills Practiced</div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {renderTopicList("💪 Strong Topics", strongTopics, "bg-green-50")}
-        {renderTopicList("🧠 Weak Topics", weakTopics, "bg-red-50")}
-      </div>
-      <h3 className="text-xl font-semibold mb-4">All Skills Breakdown</h3>
-      {skillEntries.length === 0 && searchTerm && (
-        <p className="text-gray-600 text-center">No skills found matching "{searchTerm}".</p>
-      )}
-      <div className="flex flex-wrap gap-4">
-        {skillEntries.map(([skillName, skillData]) => {
-          const progress = Math.max(0, Math.min(1, skillData.score || 0));
-          let barColor = 'bg-red-500';
-          if (progress > 0.7) barColor = 'bg-green-500';
-          else if (progress > 0.4) barColor = 'bg-yellow-500';
-          return (
-            <div key={skillName} className="w-64 p-4 bg-white rounded-lg shadow border border-gray-200">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold capitalize">{skillName}</span>
-                <span className="text-sm font-bold text-gray-600">{Math.round(progress * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className={`h-2.5 rounded-full ${barColor}`} style={{ width: `${progress * 100}%` }}></div>
-              </div>
+    <>
+      {/* --- NEW: Last Quiz Summary Section --- */}
+      {lastQuizSummary && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-semibold mb-2">Last Quiz Summary</h2>
+              <p className="text-lg text-gray-700 mb-4 truncate" title={lastQuizSummary.category}>
+                Topic: {lastQuizSummary.category.split(':').pop().trim()}
+              </p>
             </div>
-          );
-        })}
+            <button
+              onClick={onDownloadQuiz}
+              className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Download PDF
+            </button>
+          </div>
+          {lastQuizStats && lastQuizStats.total > 0 && (
+            <div className="text-center bg-gray-50 p-4 rounded-lg">
+              <span className="text-4xl font-bold text-blue-700">
+                {lastQuizStats.correct} / {lastQuizStats.total}
+              </span>
+              <p className="text-sm font-medium text-gray-600">
+                ({Math.round((lastQuizStats.correct / lastQuizStats.total) * 100)}%)
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* --- Existing Skill Dashboard --- */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-semibold mb-4">Your Skill Dashboard</h2>
+        <input
+          type="text"
+          placeholder="Search skills..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-2 focus:ring-blue-300"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-blue-50 p-4 rounded-lg text-center">
+            <div className="text-4xl font-bold text-blue-700">{Math.round(averageScore * 100)}%</div>
+            <div className="text-sm font-medium text-gray-600">Overall Accuracy</div>
+          </div>
+          <div className="bg-indigo-50 p-4 rounded-lg text-center">
+            <div className="text-4xl font-bold text-indigo-700">{totalSkills}</div>
+            <div className="text-sm font-medium text-gray-600">Skills Practiced</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {renderTopicList("💪 Strong Topics", strongTopics, "bg-green-50")}
+          {renderTopicList("🧠 Weak Topics", weakTopics, "bg-red-50")}
+        </div>
+        <h3 className="text-xl font-semibold mb-4">All Skills Breakdown</h3>
+        {skillEntries.length === 0 && searchTerm && (
+          <p className="text-gray-600 text-center">No skills found matching "{searchTerm}".</p>
+        )}
+        <div className="flex flex-wrap gap-4">
+          {skillEntries.map(([skillName, skillData]) => {
+            const progress = Math.max(0, Math.min(1, skillData.score || 0));
+            let barColor = 'bg-red-500';
+            if (progress > 0.7) barColor = 'bg-green-500';
+            else if (progress > 0.4) barColor = 'bg-yellow-500';
+            return (
+              <div key={skillName} className="w-64 p-4 bg-white rounded-lg shadow border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold capitalize">{skillName}</span>
+                  <span className="text-sm font-bold text-gray-600">{Math.round(progress * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className={`h-2.5 rounded-full ${barColor}`} style={{ width: `${progress * 100}%` }}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
+
 
 // --- The Main React Component ---
 function App() {
@@ -243,12 +283,14 @@ function App() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState(null);
 
-  // --- NEW: State for quiz source ---
+  // --- NEW: Quiz results states ---
+  const [quizResults, setQuizResults] = useState([]);
+  const [lastQuizSummary, setLastQuizSummary] = useState(null);
+  
   const [quizSource, setQuizSource] = useState('subject'); // 'subject', 'pdf', 'youtube'
   const [pdfFile, setPdfFile] = useState(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [customContext, setCustomContext] = useState('');
-  // ---
 
   const [selectedSubject, setSelectedSubject] = useState(BTECH_SUBJECTS[0]);
   const [customSubject, setCustomSubject] = useState('');
@@ -331,11 +373,19 @@ function App() {
     }
   }, [skills, user]);
 
+  // **MODIFIED**: finishQuiz now saves summary
   const finishQuiz = useCallback(() => {
-    setPage('dashboard');
+    if (quizData) { // Only save if quizData exists
+      setLastQuizSummary({ 
+        category: quizData.category, 
+        results: quizResults 
+      });
+    }
     setQuizData(null);
+    setQuizResults([]);
     setIsQuizTimed(false);
-  }, []);
+    setPage('dashboard');
+  }, [quizData, quizResults]); // Added dependencies
 
   // Timer countdown logic
   useEffect(() => {
@@ -358,10 +408,12 @@ function App() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // **MODIFIED**: handleStartQuiz now handles different sources
+  // **MODIFIED**: handleStartQuiz now resets summary/results
   const handleStartQuiz = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setQuizResults([]); // --- NEW: Clear old quiz results
+    setLastQuizSummary(null); // --- NEW: Clear old summary from dashboard
 
     const questionCount = Math.max(5, Math.min(50, numQuestions));
     let category = '';
@@ -384,10 +436,6 @@ function App() {
         category = `PDF: ${pdfFile.name}`;
 
         // --- !!! PDF SIMULATION !!! ---
-        // In a real app, you would use a library like 'pdf.js' here
-        // to extract the text from `pdfFile`.
-        // Example: const extractedText = await extractTextFromPdf(pdfFile);
-        // For now, we just simulate it:
         sourceText = "This is simulated text from your PDF. In a real app, this would be the extracted content. The Earth is the third planet from the Sun. React is a JavaScript library for building user interfaces.";
         console.warn("Simulating PDF text extraction.");
         // --- !!! END SIMULATION !!! ---
@@ -401,8 +449,6 @@ function App() {
         category = `YouTube: ${youtubeUrl}`;
 
         // --- !!! YOUTUBE BLOCK !!! ---
-        // This is NOT possible in a frontend-only app due to browser
-        // security (CORS). This requires a backend server.
         setError("YouTube transcript extraction is not possible from the browser. This feature requires a backend server to work.");
         setLoading(false);
         console.error("YouTube extraction requires a backend.");
@@ -411,12 +457,8 @@ function App() {
       }
 
       const data = await generateQuizFromAI(
-        category, 
-        'medium', 
-        questionCount, 
-        includeDescriptive,
-        customContext, // Pass the new custom context
-        sourceText     // Pass the (simulated) PDF text
+        category, 'medium', questionCount, includeDescriptive,
+        customContext, sourceText
       );
       
       if (!data || !data.questions || data.questions.length === 0) {
@@ -443,8 +485,8 @@ function App() {
     }
     setLoading(false);
   }, [
-    quizSource, selectedSubject, customSubject, pdfFile, youtubeUrl, // New dependencies
-    numQuestions, includeDescriptive, timerEnabled, timerDuration, customContext // New dependency
+    quizSource, selectedSubject, customSubject, pdfFile, youtubeUrl,
+    numQuestions, includeDescriptive, timerEnabled, timerDuration, customContext
   ]);
 
   const handleNextQuestion = useCallback(() => {
@@ -458,11 +500,25 @@ function App() {
     }
   }, [currentQIndex, quizData, finishQuiz]);
 
+  // **MODIFIED**: handleSubmitAnswer now saves results
   const handleSubmitAnswer = useCallback(() => {
     if (!quizData) return;
     const question = quizData.questions[currentQIndex];
     const isCorrect = selectedAnswer.toLowerCase() === question.answer.toLowerCase();
     const score = isCorrect ? 1 : 0;
+
+    // --- NEW: Save the result of this question ---
+    const result = {
+      prompt: question.prompt,
+      type: question.type,
+      choices: question.choices || [],
+      userAnswer: selectedAnswer,
+      correctAnswer: question.answer,
+      explanation: question.explanation,
+      isCorrect: score > 0,
+    };
+    setQuizResults(prevResults => [...prevResults, result]);
+    // ---
     
     setSkills(prevSkills => {
       const newSkills = { ...prevSkills };
@@ -481,6 +537,66 @@ function App() {
       explanation: question.explanation,
     });
   }, [quizData, currentQIndex, selectedAnswer]);
+
+  // **NEW**: PDF Download Function
+  const handleDownloadQuiz = useCallback(() => {
+    if (!lastQuizSummary) return;
+
+    const doc = new jsPDF();
+    const margin = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - margin * 2;
+    let y = 15; // Initial Y position
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(`Quiz Summary: ${lastQuizSummary.category.split(':').pop().trim()}`, margin, y);
+    y += 10;
+
+    lastQuizSummary.results.forEach((result, index) => {
+      if (y > 270) { // Check if new page is needed
+        doc.addPage();
+        y = 15;
+      }
+
+      // Question
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      const questionText = doc.splitTextToSize(`Q${index + 1}: ${result.prompt}`, usableWidth);
+      doc.text(questionText, margin, y);
+      y += questionText.length * 5;
+
+      // User Answer
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      if (result.isCorrect) {
+        doc.setTextColor(0, 100, 0); // Green
+      } else {
+        doc.setTextColor(200, 0, 0); // Red
+      }
+      const userAnswerText = doc.splitTextToSize(`Your Answer: ${result.userAnswer}`, usableWidth);
+      doc.text(userAnswerText, margin, y);
+      y += userAnswerText.length * 5;
+
+      // Correct Answer
+      doc.setTextColor(0, 0, 0); // Reset color
+      if (!result.isCorrect) {
+        const correctAnswerText = doc.splitTextToSize(`Correct Answer: ${result.correctAnswer}`, usableWidth);
+        doc.text(correctAnswerText, margin, y);
+        y += correctAnswerText.length * 5;
+      }
+      
+      // Explanation
+      doc.setFont('helvetica', 'italic');
+      const explanationText = doc.splitTextToSize(`Explanation: ${result.explanation}`, usableWidth);
+      doc.text(explanationText, margin, y);
+      y += explanationText.length * 5;
+
+      y += 10; // Add spacing between questions
+    });
+
+    doc.save('smart-quiz-summary.pdf');
+  }, [lastQuizSummary]);
 
   // Keyboard navigation effect
   useEffect(() => {
@@ -501,7 +617,7 @@ function App() {
         }
       }
 
-      // **MODIFIED**: Handle '1, 2, 3, 4' keys as alternatives to 'a, b, c, d'
+      // **MODIFIED**: Handle '1, 2, 3, 4' keys
       if (!feedback && question.type === 'mcq') {
         let choiceIndex = -1;
         if (key === 'a' || key === '1') choiceIndex = 0;
@@ -520,7 +636,7 @@ function App() {
     };
   }, [page, feedback, selectedAnswer, quizData, currentQIndex, user, handleNextQuestion, handleSubmitAnswer]);
 
-  // --- Render Functions for Each Page ---
+  // --- Render Functions ---
 
   const renderLoginScreen = () => (
     <div className="text-center bg-white p-8 rounded-lg shadow-md max-w-sm mx-auto">
@@ -564,7 +680,6 @@ function App() {
     </div>
   );
 
-  // **MODIFIED**: Added new quiz source UI
   const renderHomeScreen = () => (
     <div className="space-y-8">
       <h1 className="text-4xl font-bold text-center">Welcome back, {user.username}!</h1>
@@ -572,7 +687,7 @@ function App() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold mb-4">Start a New Quiz</h2>
         
-        {/* **NEW**: UI for selecting quiz source */}
+        {/* --- NEW: Quiz Source --- */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Source</label>
           <div className="flex rounded-lg shadow-sm">
@@ -599,7 +714,6 @@ function App() {
 
         <div className="space-y-4">
           
-          {/* Conditional UI based on source */}
           {quizSource === 'subject' && (
             <>
               <div>
@@ -661,7 +775,7 @@ function App() {
             </div>
           )}
           
-          {/* **NEW**: Optional Context */}
+          {/* --- NEW: Optional Context --- */}
           <div>
             <label htmlFor="custom-context" className="block text-sm font-medium text-gray-700 mb-1">
               Optional Context
@@ -675,7 +789,6 @@ function App() {
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
             />
           </div>
-
           <hr />
 
           {/* Quiz Options */}
@@ -737,9 +850,7 @@ function App() {
       setError("An error occurred with the quiz data. Returning home.");
       return null;
     }
-
     const question = quizData.questions[currentQIndex];
-
     if (!question) {
       console.error("Quiz index out of bounds.");
       setError("An error occurred with the quiz question. Returning to dashboard.");
@@ -765,6 +876,7 @@ function App() {
             {question.type === 'mcq' ? (
               question.choices.map((choice, index) => {
                 const choiceId = `q_${question.id}_choice_${index}`;
+                // **MODIFIED**: Show (1, 2, 3, 4) as well
                 const keyLabel = ['A', 'B', 'C', 'D'][index];
                 return (
                   <label 
@@ -810,9 +922,14 @@ function App() {
     );
   };
 
+  // **MODIFIED**: Pass summary and download handler to dashboard
   const renderDashboardScreen = () => (
     <div className="space-y-6">
-      <DashboardComponent skills={skills} />
+      <DashboardComponent 
+        skills={skills} 
+        lastQuizSummary={lastQuizSummary}
+        onDownloadQuiz={handleDownloadQuiz}
+      />
       <button onClick={() => setPage('home')} className="mt-6 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">
         Take Another Quiz
       </button>

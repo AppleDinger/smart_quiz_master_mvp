@@ -44,11 +44,38 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-async function generateQuizFromAI(category, difficulty, numQuestions, includeDescriptive) {
+// **MODIFIED**: Now accepts customContext and sourceText
+async function generateQuizFromAI(
+  category, 
+  difficulty, 
+  numQuestions, 
+  includeDescriptive,
+  customContext,
+  sourceText = null
+) {
   console.log(`Generating ${numQuestions} questions...`);
+
   const questionTypeInstructions = includeDescriptive
     ? `You can include "mcq" (multiple choice) and "short" (short answer) questions.`
     : `You MUST ONLY include "mcq" (multiple choice) questions. Do not include "short" answer questions.`;
+
+  // **NEW**: Dynamically build the main prompt instruction
+  const sourceInstruction = sourceText
+    ? `Generate a ${numQuestions}-question quiz with ${difficulty} difficulty based ONLY on the following provided text:
+---BEGIN TEXT---
+${sourceText}
+---END TEXT---
+`
+    : `Generate a ${numQuestions}-question quiz about "${category}" with a ${difficulty} difficulty.`;
+  
+  const contextInstruction = customContext
+    ? `Use the following optional context to help guide the question topics and focus:
+---BEGIN CONTEXT---
+${customContext}
+---END CONTEXT---
+`
+    : "No additional context was provided.";
+
   const questionExamples = [
     {
       "id": "q1", "prompt": "MCQ prompt here...", "type": "mcq",
@@ -64,10 +91,17 @@ async function generateQuizFromAI(category, difficulty, numQuestions, includeDes
       "skills": ["skill3"], "difficulty": 0.7
     });
   }
+  
+  // **MODIFIED**: Assembled new prompt
   const prompt = `
     You are a helpful quiz generation assistant.
-    Generate a ${numQuestions}-question quiz about "${category}" with a ${difficulty} difficulty.
+    
+    ${sourceInstruction}
+    
+    ${contextInstruction}
+    
     ${questionTypeInstructions}
+
     Respond with ONLY a valid JSON object in the following format:
     {
       "category": "${category}",
@@ -75,6 +109,7 @@ async function generateQuizFromAI(category, difficulty, numQuestions, includeDes
       "questions": ${JSON.stringify(questionExamples, null, 2)}
     }
   `;
+
   try {
     const result = await model.generateContent(prompt);
     const response = result.response;
@@ -208,6 +243,13 @@ function App() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState(null);
 
+  // --- NEW: State for quiz source ---
+  const [quizSource, setQuizSource] = useState('subject'); // 'subject', 'pdf', 'youtube'
+  const [pdfFile, setPdfFile] = useState(null);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [customContext, setCustomContext] = useState('');
+  // ---
+
   const [selectedSubject, setSelectedSubject] = useState(BTECH_SUBJECTS[0]);
   const [customSubject, setCustomSubject] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
@@ -289,7 +331,6 @@ function App() {
     }
   }, [skills, user]);
 
-  // **MODIFIED**: finishQuiz moved before timer useEffect
   const finishQuiz = useCallback(() => {
     setPage('dashboard');
     setQuizData(null);
@@ -317,27 +358,72 @@ function App() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // **MODIFIED**: Added validation inside handleStartQuiz
+  // **MODIFIED**: handleStartQuiz now handles different sources
   const handleStartQuiz = useCallback(async () => {
-    const category = selectedSubject === 'Custom' ? customSubject : selectedSubject;
-    if (!category) {
-      setError("Please select a subject or enter a custom topic.");
-      return;
-    }
-    const questionCount = Math.max(5, Math.min(50, numQuestions));
-    setNumQuestions(questionCount);
     setLoading(true);
     setError(null);
+
+    const questionCount = Math.max(5, Math.min(50, numQuestions));
+    let category = '';
+    let sourceText = null;
+
     try {
-      const data = await generateQuizFromAI(category, 'medium', questionCount, includeDescriptive);
+      if (quizSource === 'subject') {
+        category = selectedSubject === 'Custom' ? customSubject : selectedSubject;
+        if (!category) {
+          setError("Please select a subject or enter a custom topic.");
+          setLoading(false);
+          return;
+        }
+      } else if (quizSource === 'pdf') {
+        if (!pdfFile) {
+          setError("Please upload a PDF file.");
+          setLoading(false);
+          return;
+        }
+        category = `PDF: ${pdfFile.name}`;
+
+        // --- !!! PDF SIMULATION !!! ---
+        // In a real app, you would use a library like 'pdf.js' here
+        // to extract the text from `pdfFile`.
+        // Example: const extractedText = await extractTextFromPdf(pdfFile);
+        // For now, we just simulate it:
+        sourceText = "This is simulated text from your PDF. In a real app, this would be the extracted content. The Earth is the third planet from the Sun. React is a JavaScript library for building user interfaces.";
+        console.warn("Simulating PDF text extraction.");
+        // --- !!! END SIMULATION !!! ---
+
+      } else if (quizSource === 'youtube') {
+        if (!youtubeUrl) {
+          setError("Please paste a YouTube URL.");
+          setLoading(false);
+          return;
+        }
+        category = `YouTube: ${youtubeUrl}`;
+
+        // --- !!! YOUTUBE BLOCK !!! ---
+        // This is NOT possible in a frontend-only app due to browser
+        // security (CORS). This requires a backend server.
+        setError("YouTube transcript extraction is not possible from the browser. This feature requires a backend server to work.");
+        setLoading(false);
+        console.error("YouTube extraction requires a backend.");
+        return;
+        // --- !!! END BLOCK !!! ---
+      }
+
+      const data = await generateQuizFromAI(
+        category, 
+        'medium', 
+        questionCount, 
+        includeDescriptive,
+        customContext, // Pass the new custom context
+        sourceText     // Pass the (simulated) PDF text
+      );
       
-      // --- NEW VALIDATION ---
       if (!data || !data.questions || data.questions.length === 0) {
         setError("The AI failed to generate any questions for this topic. Please try again or be more specific.");
         setLoading(false);
         return;
       }
-      // --- END VALIDATION ---
 
       setQuizData(data);
       setCurrentQIndex(0);
@@ -351,11 +437,15 @@ function App() {
         setTimeLeft(0);
       }
       setPage('quiz');
+
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
-  }, [selectedSubject, customSubject, numQuestions, includeDescriptive, timerEnabled, timerDuration]);
+  }, [
+    quizSource, selectedSubject, customSubject, pdfFile, youtubeUrl, // New dependencies
+    numQuestions, includeDescriptive, timerEnabled, timerDuration, customContext // New dependency
+  ]);
 
   const handleNextQuestion = useCallback(() => {
     if (!quizData) return;
@@ -398,7 +488,6 @@ function App() {
       if (page !== 'quiz' || !quizData || !user) return; 
 
       const question = quizData.questions[currentQIndex];
-      // **FIX**: Add check for question
       if (!question) return;
 
       const key = e.key.toLowerCase();
@@ -411,12 +500,15 @@ function App() {
           handleSubmitAnswer();
         }
       }
+
+      // **MODIFIED**: Handle '1, 2, 3, 4' keys as alternatives to 'a, b, c, d'
       if (!feedback && question.type === 'mcq') {
         let choiceIndex = -1;
-        if (key === 'a') choiceIndex = 0;
-        else if (key === 'b') choiceIndex = 1;
-        else if (key === 'c') choiceIndex = 2;
-        else if (key === 'd') choiceIndex = 3;
+        if (key === 'a' || key === '1') choiceIndex = 0;
+        else if (key === 'b' || key === '2') choiceIndex = 1;
+        else if (key === 'c' || key === '3') choiceIndex = 2;
+        else if (key === 'd' || key === '4') choiceIndex = 3;
+
         if (choiceIndex !== -1 && question.choices[choiceIndex]) {
           setSelectedAnswer(question.choices[choiceIndex]);
         }
@@ -472,39 +564,121 @@ function App() {
     </div>
   );
 
+  // **MODIFIED**: Added new quiz source UI
   const renderHomeScreen = () => (
     <div className="space-y-8">
       <h1 className="text-4xl font-bold text-center">Welcome back, {user.username}!</h1>
       
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold mb-4">Start a New Quiz</h2>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="subject-select" className="block text-sm font-medium text-gray-700 mb-1">Select a Subject</label>
-            <select
-              id="subject-select"
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+        
+        {/* **NEW**: UI for selecting quiz source */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Source</label>
+          <div className="flex rounded-lg shadow-sm">
+            <button
+              onClick={() => setQuizSource('subject')}
+              className={`flex-1 p-3 rounded-l-lg ${quizSource === 'subject' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
             >
-              {BTECH_SUBJECTS.map(subject => (
-                <option key={subject} value={subject}>{subject}</option>
-              ))}
-            </select>
+              Subject
+            </button>
+            <button
+              onClick={() => setQuizSource('pdf')}
+              className={`flex-1 p-3 ${quizSource === 'pdf' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              PDF
+            </button>
+            <button
+              onClick={() => setQuizSource('youtube')}
+              className={`flex-1 p-3 rounded-r-lg ${quizSource === 'youtube' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              YouTube
+            </button>
           </div>
-          {selectedSubject === 'Custom' && (
+        </div>
+
+        <div className="space-y-4">
+          
+          {/* Conditional UI based on source */}
+          {quizSource === 'subject' && (
+            <>
+              <div>
+                <label htmlFor="subject-select" className="block text-sm font-medium text-gray-700 mb-1">Select a Subject</label>
+                <select
+                  id="subject-select"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+                >
+                  {BTECH_SUBJECTS.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedSubject === 'Custom' && (
+                <div>
+                  <label htmlFor="custom-subject" className="block text-sm font-medium text-gray-700 mb-1">Enter Custom Topic</label>
+                  <input
+                    type="text"
+                    id="custom-subject"
+                    placeholder="e.g., 'React Hooks' or 'SQL Joins'"
+                    value={customSubject}
+                    onChange={(e) => setCustomSubject(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {quizSource === 'pdf' && (
             <div>
-              <label htmlFor="custom-subject" className="block text-sm font-medium text-gray-700 mb-1">Enter Custom Topic</label>
+              <label htmlFor="pdf-upload" className="block text-sm font-medium text-gray-700 mb-1">Upload PDF</label>
               <input
-                type="text"
-                id="custom-subject"
-                placeholder="e.g., 'React Hooks' or 'SQL Joins'"
-                value={customSubject}
-                onChange={(e) => setCustomSubject(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+                id="pdf-upload"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files[0])}
+                className="w-full p-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
+              {pdfFile && <p className="text-sm text-gray-600 mt-2">File: {pdfFile.name}</p>}
+              <p className="text-xs text-gray-500 mt-1">* PDF text extraction is **simulated** in this demo.</p>
             </div>
           )}
+
+          {quizSource === 'youtube' && (
+            <div>
+              <label htmlFor="youtube-url" className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+              <input
+                type="text"
+                id="youtube-url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+              />
+              <p className="text-xs text-red-500 mt-1">* This feature requires a backend server and is disabled.</p>
+            </div>
+          )}
+          
+          {/* **NEW**: Optional Context */}
+          <div>
+            <label htmlFor="custom-context" className="block text-sm font-medium text-gray-700 mb-1">
+              Optional Context
+            </label>
+            <textarea
+              id="custom-context"
+              rows="3"
+              placeholder="e.g., 'Focus on the recent developments' or 'Only ask about chapter 2...'"
+              value={customContext}
+              onChange={(e) => setCustomContext(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <hr />
+
+          {/* Quiz Options */}
           <div>
             <label htmlFor="num-questions" className="block text-sm font-medium text-gray-700 mb-1">Number of Questions (5-50)</label>
             <input
@@ -540,6 +714,7 @@ function App() {
             <input id="include-descriptive" type="checkbox" checked={includeDescriptive} onChange={(e) => setIncludeDescriptive(e.target.checked)} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
             <label htmlFor="include-descriptive" className="ml-2 block text-sm text-gray-900">Include Descriptive (Short Answer) Questions</label>
           </div>
+          
           <button
             onClick={handleStartQuiz}
             disabled={loading}
@@ -555,13 +730,12 @@ function App() {
     </div>
   );
 
-  // **MODIFIED**: Added robust checks
   const renderQuizScreen = () => {
     if (!quizData || !quizData.questions || quizData.questions.length === 0) {
       console.error("Rendered quiz screen with invalid quiz data.");
       setPage('home');
       setError("An error occurred with the quiz data. Returning home.");
-      return null; // Render nothing this cycle
+      return null;
     }
 
     const question = quizData.questions[currentQIndex];
@@ -569,14 +743,16 @@ function App() {
     if (!question) {
       console.error("Quiz index out of bounds.");
       setError("An error occurred with the quiz question. Returning to dashboard.");
-      finishQuiz(); // This sets page to dashboard
-      return null; // Render nothing this cycle
+      finishQuiz();
+      return null;
     }
     
     return (
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold">Quiz: {quizData.category}</h1>
+          <h1 className="text-3xl font-bold truncate" title={quizData.category}>
+            Quiz: {quizData.category.split(':').pop().trim()}
+          </h1>
           {isQuizTimed && (
             <div className="text-2xl font-bold text-red-600 bg-red-100 px-4 py-2 rounded-lg">
               {formatTime(timeLeft)}
@@ -610,7 +786,7 @@ function App() {
           </div>
           {!feedback && (
             <button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
-              Submit Answer (Enter)
+              Submit Answer (Enter / 1-4)
             </button>
           )}
         </div>

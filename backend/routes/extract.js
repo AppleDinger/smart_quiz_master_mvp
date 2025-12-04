@@ -12,6 +12,7 @@ const { YoutubeTranscript } = require('youtube-transcript');
 
 // --- HELPER 1: Extract Video ID from YouTube URL ---
 function getYoutubeVideoId(url) {
+  // Regex to handle full URLs, short links (youtu.be), and embeds
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
   return (match && match[2].length === 11) ? match[2] : null;
@@ -149,10 +150,17 @@ router.post('/youtube', async (req, res) => {
       return res.status(400).json({ error: 'Invalid YouTube URL format' });
     }
 
-    // Step B: Fetch Transcript
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' });
+    console.log(`Fetching transcript for Video ID: ${videoId}`);
+
+    // Step B: Fetch Transcript (Any Language)
+    // REMOVED { lang: 'en' } to allow auto-generated captions
+    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
     
     // Step C: Combine Text
+    if (!transcriptItems || transcriptItems.length === 0) {
+        throw new Error("Transcript empty or not found.");
+    }
+
     const fullText = transcriptItems.map(item => item.text).join(' ');
 
     res.json({ ok: true, transcript: fullText });

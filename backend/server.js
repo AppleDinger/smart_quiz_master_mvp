@@ -118,10 +118,30 @@ app.post("/api/generate-quiz", async (req, res) => {
 });
 
 // 3. EXISTING ROUTES (Keep your existing logic)
-try {
-  app.use("/api/extract", require("./routes/extract"));
-} catch (err) { console.warn("extract route missing"); }
+// --- ROUTES ---
 
+// HEALTH CHECK
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, message: "Backend is running!" });
+});
+
+// EXTRACTION ROUTE (Debug Mode)
+try {
+  // Try to require the file
+  const extractRoute = require("./routes/extract");
+  // If successful, use it
+  app.use("/api/extract", extractRoute);
+  console.log("✅ Extract route loaded successfully.");
+} catch (err) {
+  // If it fails, PRINT THE EXACT ERROR
+  console.error("❌ CRITICAL ERROR: Could not load extract route.");
+  console.error("Reason:", err.message);
+  if (err.code === 'MODULE_NOT_FOUND') {
+    console.error("Hint: Check if 'backend/routes/extract.js' exists.");
+  } else {
+    console.error("Hint: A library inside extract.js failed to load.");
+  }
+}
 try {
   app.use("/api/save-attempt", require("./routes/saveAttempt"));
 } catch (err) { console.warn("saveAttempt route missing"); }

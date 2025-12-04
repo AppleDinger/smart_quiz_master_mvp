@@ -2,17 +2,22 @@
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
 const pdfParse = require('pdf-parse');
+
+// --- HEAVY LIBRARIES (OCR & Rendering) ---
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 const { createCanvas } = require('canvas');
 const Tesseract = require('tesseract.js');
-
 const { YoutubeTranscript } = require('youtube-transcript');
 
-// Helper: extract using pdf-parse (selectable text)
+// --- HELPER 1: Extract Video ID from YouTube URL ---
+function getYoutubeVideoId(url) {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
+// --- HELPER 2: Extract Text using pdf-parse (Fast) ---
 async function extractTextPdfParse(buffer) {
   try {
     const data = await pdfParse(buffer);
@@ -23,14 +28,16 @@ async function extractTextPdfParse(buffer) {
   }
 }
 
-// Helper: render a PDF page to PNG buffer using pdfjs + node-canvas
+// --- HELPER 3: Render PDF Page to Image (for OCR) ---
 async function renderPdfPageToPngBuffer(pdfDocument, pageNum, scale = 1.5) {
   const page = await pdfDocument.getPage(pageNum);
   const viewport = page.getViewport({ scale });
+  
+  // Create Canvas
   const canvas = createCanvas(viewport.width, viewport.height);
   const ctx = canvas.getContext('2d');
 
-  // pdfjs requires a NodeCanvasFactory - provide a simple one
+  // Canvas Factory for pdfjs
   const canvasFactory = {
     create: (w, h) => {
       const c = createCanvas(w, h);
@@ -44,7 +51,7 @@ async function renderPdfPageToPngBuffer(pdfDocument, pageNum, scale = 1.5) {
       canvasAndContext.height = h;
     },
     destroy: (canvasAndContext) => {
-      // nothing to do for node-canvas
+      // Node-canvas handles garbage collection
     }
   };
 
@@ -55,18 +62,17 @@ async function renderPdfPageToPngBuffer(pdfDocument, pageNum, scale = 1.5) {
   };
 
   await page.render(renderContext).promise;
-
   return canvas.toBuffer('image/png');
 }
 
-// Helper: OCR an array of image buffers with tesseract.js (sequential to limit memory)
+// --- HELPER 4: OCR Logic (Tesseract) ---
 async function ocrImageBuffers(buffers, lang = 'eng') {
   let fullText = '';
   for (let i = 0; i < buffers.length; i++) {
     const buf = buffers[i];
     try {
       const { data: { text } } = await Tesseract.recognize(buf, lang, {
-        logger: m => { /* optional logging: console.log('tess', m) */ }
+        logger: m => { /* console.log(m) */ } // hiding logs to keep console clean
       });
       fullText += '\n\n' + text;
     } catch (err) {
@@ -76,8 +82,11 @@ async function ocrImageBuffers(buffers, lang = 'eng') {
   return fullText.trim();
 }
 
-// Main route: POST /api/extract/pdf
-// Expects file in field 'file' via express-fileupload (req.files.file)
+// ==========================================
+// ROUTES
+// ==========================================
+
+// 1. PDF EXTRACTION (Text + OCR Fallback)
 router.post('/pdf', async (req, res) => {
   try {
     if (!req.files || !req.files.file) {
@@ -85,23 +94,23 @@ router.post('/pdf', async (req, res) => {
     }
 
     const uploaded = req.files.file;
-    // uploaded.data available when using express-fileupload with no temp files
     const buffer = uploaded.data || fs.readFileSync(uploaded.tempFilePath);
 
-    // 1) Try text extraction via pdf-parse
-    let extracted = await extractTextPdfParse(buffer || Buffer.from([]));
+    // Step A: Fast Text Extract
+    let extracted = await extractTextPdfParse(buffer);
 
-    // If primary extraction is short, fallback to OCR using Tesseract (via pdfjs rendering)
-    if (!extracted || extracted.length < 300) {
-      console.log('Primary PDF text short; running JS OCR fallback (this may take a few seconds)...');
+    // Step B: OCR Fallback if text is too short (< 100 chars)
+    if (!extracted || extracted.length < 100) {
+      console.log('PDF text empty or short. Running OCR fallback...');
 
-      // Load PDF with pdfjs from buffer; pdfjs needs Uint8Array
+      // Load PDF for Rendering
       const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
       const pdfDoc = await loadingTask.promise;
 
-      // Limit pages to first N to save time
-      const maxPages = Math.min(10, pdfDoc.numPages); // adjust as needed
+      // Limit to first 5 pages to prevent timeouts
+      const maxPages = Math.min(5, pdfDoc.numPages);
       const imgBuffers = [];
+
       for (let p = 1; p <= maxPages; p++) {
         try {
           const imgBuf = await renderPdfPageToPngBuffer(pdfDoc, p, 1.5);
@@ -116,12 +125,9 @@ router.post('/pdf', async (req, res) => {
         if (ocrText && ocrText.length > extracted.length) {
           extracted = ocrText;
         }
-      } else {
-        console.warn('No images rendered for OCR fallback.');
       }
     }
 
-    // Return the extracted text (may be empty)
     return res.json({ ok: true, text: extracted || '' });
   } catch (err) {
     console.error('extract/pdf error:', err);
@@ -129,8 +135,7 @@ router.post('/pdf', async (req, res) => {
   }
 });
 
-module.exports = router;
-
+// 2. YOUTUBE EXTRACTION (Fixed Logic)
 router.post('/youtube', async (req, res) => {
   try {
     const { url } = req.body;
@@ -138,20 +143,35 @@ router.post('/youtube', async (req, res) => {
       return res.status(400).json({ error: 'No URL provided' });
     }
 
-    // Extract transcript
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(url);
+    // Step A: Get Video ID
+    const videoId = getYoutubeVideoId(url);
+    if (!videoId) {
+      return res.status(400).json({ error: 'Invalid YouTube URL format' });
+    }
+
+    // Step B: Fetch Transcript
+    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' });
     
-    // Join all text parts into one string
+    // Step C: Combine Text
     const fullText = transcriptItems.map(item => item.text).join(' ');
 
     res.json({ ok: true, transcript: fullText });
 
   } catch (err) {
     console.error('YouTube extraction error:', err);
-    // Handle disabled captions or invalid URLs
+    
+    let errorMessage = 'Failed to extract captions.';
+    const errStr = String(err);
+
+    if (errStr.includes("Sign in")) {
+      errorMessage = "YouTube blocked the server (Bot detection). Try a different video.";
+    } else if (errStr.includes("Captions are disabled")) {
+      errorMessage = "This video does not have captions enabled.";
+    }
+
     res.status(500).json({ 
-      error: 'Failed to extract captions. Make sure the video has captions enabled.',
-      details: String(err) 
+      error: errorMessage,
+      details: errStr 
     });
   }
 });

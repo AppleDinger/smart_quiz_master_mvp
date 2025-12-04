@@ -6,7 +6,6 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
 const app = express();
-const PORT = process.env.PORT || 4000;
 
 // Initialize Gemini (Accessing key safely from server environment)
 // Note: Make sure GEMINI_API_KEY is set in your Render Dashboard

@@ -1,8 +1,26 @@
 // server.js
+require('dotenv').config(); // Load environment variables
 const express = require("express");
 const cors = require("cors");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// init datastore (if present)
+// --- CONFIGURATION ---
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// Initialize Gemini (Accessing key safely from server environment)
+// Note: Make sure GEMINI_API_KEY is set in your Render Dashboard
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Middleware
+app.use(cors());
+app.use(express.json()); // Allows parsing JSON bodies
+
+// File Upload Support
+const fileUpload = require("express-fileupload");
+app.use(fileUpload({ useTempFiles: false }));
+
+// --- DATABASE INIT (Keep your existing logic) ---
 let dataStore;
 try {
   dataStore = require("./data-store");
@@ -11,42 +29,111 @@ try {
   console.warn("data-store not found or failed to init (OK for early dev):", err?.message || err);
 }
 
-const app = express();
+// --- ROUTES ---
 
-app.use(cors());
-app.use(express.json());
+// 1. HEALTH CHECK
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, message: "Backend is running!" });
+});
 
-/* ⭐⭐ ADD THESE TWO LINES HERE ⭐⭐ */
-const fileUpload = require("express-fileupload");
-app.use(fileUpload({ useTempFiles: false }));
-/* ⭐⭐ END ADDED CODE ⭐⭐ */
+// 2. GENERATE QUIZ ROUTE (The new secure route)
+// server.js (Updated Route)
 
-// Register extraction route (if you created it earlier)
+app.post("/api/generate-quiz", async (req, res) => {
+  try {
+    // 1. Receive all the complex parameters from Frontend
+    const { 
+      category, 
+      difficulty, 
+      numQuestions, 
+      includeDescriptive, 
+      customContext, 
+      sourceText, 
+      skillList 
+    } = req.body;
+
+    // 2. Reconstruct your specific Prompt Logic here (on the server)
+    const questionTypeInstructions = includeDescriptive
+      ? `Include both MCQ and short-answer questions.`
+      : `Include ONLY MCQs.`;
+
+    let sourceInstruction;
+    if (sourceText) {
+      sourceInstruction = `Generate all questions ONLY from this text:\n${sourceText.substring(0, 10000)}`; // Limit length for safety
+    } else if (skillList && skillList.length > 0) {
+      sourceInstruction = `Cover ALL of these topics equally: ${skillList.join(", ")}`;
+    } else {
+      sourceInstruction = `Generate questions strictly from the topic "${category}".`;
+    }
+
+    const contextInstruction = customContext
+      ? `Additional focus: ${customContext}`
+      : "";
+
+    const prompt = `
+      You are an expert quiz generator.
+      ${sourceInstruction}
+      ${contextInstruction}
+
+      Difficulty: ${difficulty}
+      Question Count: ${numQuestions}
+      ${questionTypeInstructions}
+
+      IMPORTANT:
+      Return ONLY valid JSON in this structure:
+      {
+        "category": "${category}",
+        "difficulty": "${difficulty}",
+        "questions": [
+          {
+            "id": "q1",
+            "prompt": "question text",
+            "type": "mcq" | "short",
+            "choices": ["A","B","C","D"],
+            "answer": "correct answer",
+            "explanation": "why this is correct",
+            "skills": ["skill1", "skill2"],
+            "difficulty": 0.5
+          }
+        ]
+      }
+      All questions must be ORIGINAL and fully based on the given topic.
+    `;
+
+    // 3. Call Gemini (Safe because API Key is on the server)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    
+    // 4. Clean and Parse JSON
+    let text = response.text();
+    text = text.replace(/^```json/i, '').replace(/```$/i, '').trim();
+    
+    // 5. Send back to Frontend
+    res.json({ quizData: JSON.parse(text) });
+
+  } catch (error) {
+    console.error("Backend AI Error:", error);
+    res.status(500).json({ error: "Generation failed", details: error.message });
+  }
+});
+
+// 3. EXISTING ROUTES (Keep your existing logic)
 try {
   app.use("/api/extract", require("./routes/extract"));
-} catch (err) {
-  console.warn("extract route not found or failed to load:", err?.message || err);
-}
+} catch (err) { console.warn("extract route missing"); }
 
-// Save-attempt and leaderboard routes
 try {
   app.use("/api/save-attempt", require("./routes/saveAttempt"));
-} catch (err) {
-  console.warn("saveAttempt route not found or failed to load:", err?.message || err);
-}
+} catch (err) { console.warn("saveAttempt route missing"); }
 
 try {
   app.use("/api/leaderboard", require("./routes/leaderboard"));
-} catch (err) {
-  console.warn("leaderboard route not found or failed to load:", err?.message || err);
-}
+} catch (err) { console.warn("leaderboard route missing"); }
 
-// health check
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true });
-});
 
-const PORT = process.env.PORT || 4000;
+// ✅ CORRECT
+const PORT = process.env.PORT || 4000; 
 app.listen(PORT, () => {
-  console.log(`Smart Quiz backend running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

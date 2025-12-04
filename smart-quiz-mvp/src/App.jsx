@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import Leaderboard from './components/Leaderboard';
 
 // --- Config & constants ---
-const BACKEND_BASE = 'http://localhost:4000'; // adjust if your backend runs elsewhere
+
 const USERS_DB_KEY = "smartQuizUsers";
 const SKILLS_DB_PREFIX = "smartQuizSkills_";
 
@@ -82,8 +82,10 @@ async function extractYoutubeFromServer(url) {
   return data.transcript || '';
 }
 
-// --- Improved LLM quiz generator (grounded + chunking + strict JSON) ---
-// Replace your existing generateQuizFromAI with this improved, relevance-aware version
+
+// ✅ Corrected URL (matches your real Render server)
+const API_BASE_URL = "https://smart-quiz-master-x55k.onrender.com";
+
 async function generateQuizFromAI(
   category, 
   difficulty, 
@@ -93,79 +95,44 @@ async function generateQuizFromAI(
   sourceText = null,
   skillList = []
 ) {
-  if (!model) {
-    throw new Error("AI Model not initialized. Check VITE_GEMINI_API_KEY.");
-  }
-
-  const questionTypeInstructions = includeDescriptive
-    ? `Include both MCQ and short-answer questions.`
-    : `Include ONLY MCQs.`;
-
-  // Build source instruction
-  let sourceInstruction;
-  if (sourceText) {
-    sourceInstruction = `Generate all questions ONLY from this text:\n${sourceText}`;
-  } else if (skillList.length > 0) {
-    sourceInstruction = `Cover ALL of these topics equally: ${skillList.join(", ")}`;
-  } else {
-    sourceInstruction = `Generate questions strictly from the topic "${category}".`;
-  }
-
-  const contextInstruction = customContext
-    ? `Additional focus: ${customContext}`
-    : "";
-
-  const prompt = `
-You are an expert quiz generator.
-
-${sourceInstruction}
-
-${contextInstruction}
-
-Difficulty: ${difficulty}
-Question Count: ${numQuestions}
-${questionTypeInstructions}
-
-IMPORTANT:
-Return ONLY valid JSON in this structure:
-{
-  "category": "${category}",
-  "difficulty": "${difficulty}",
-  "questions": [
-    {
-      "id": "q1",
-      "prompt": "question text",
-      "type": "mcq" | "short",
-      "choices": ["A","B","C","D"],   // only for MCQ
-      "answer": "correct answer",
-      "explanation": "why this is correct",
-      "skills": ["skill1", "skill2"],
-      "difficulty": 0.5
-    }
-  ]
-}
-All questions must be ORIGINAL and fully based on the given topic.
-  `;
-
+  
   try {
-    const result = await model.generateContent(prompt);
-    let text = result.response.text();
-
-    // Clean markdown wrappers
-    text = text.replace(/^```json/i, '').replace(/```$/i, '');
-
-    const quizData = JSON.parse(text);
-
-    // Assign IDs
-    quizData.questions.forEach((q, index) => {
-      q.id = `q_${Date.now()}_${index + 1}`;
+    // 1. Send the data to your Backend
+    const response = await fetch(`${API_BASE_URL}/api/generate-quiz`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category,
+        difficulty,
+        numQuestions,
+        includeDescriptive,
+        customContext,
+        sourceText,
+        skillList
+      }),
     });
+
+    if (!response.ok) {
+      throw new Error(`Server Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const quizData = data.quizData;
+
+    // 2. Assign IDs (Frontend logic to keep UI consistent)
+    if (quizData.questions) {
+      quizData.questions.forEach((q, index) => {
+        q.id = `q_${Date.now()}_${index + 1}`;
+      });
+    }
 
     return quizData;
 
   } catch (error) {
-    console.error("AI error:", error);
-    throw new Error("Quiz generation failed. Try again with a simpler topic.");
+    console.error("AI Generation Error:", error);
+    throw new Error("Quiz generation failed. Please check your connection.");
   }
 }
 

@@ -930,8 +930,15 @@ if (!sourceText || sourceText.trim().length < 150) {
       return renderDashboardScreen();
 
     // ⭐ ADD THIS CASE ⭐
+    // ... inside renderPage switch statement ...
     case 'leaderboard':
-      return <Leaderboard onClose={() => setPage('dashboard')} />;
+      // ✅ Pass the API_BASE_URL prop
+      return (
+        <Leaderboard 
+          onClose={() => setPage('dashboard')} 
+          apiBase={API_BASE_URL} 
+        />
+      );
 
     case 'home':
     default:

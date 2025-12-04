@@ -10,6 +10,8 @@ const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 const { createCanvas } = require('canvas');
 const Tesseract = require('tesseract.js');
 
+const { YoutubeTranscript } = require('youtube-transcript');
+
 // Helper: extract using pdf-parse (selectable text)
 async function extractTextPdfParse(buffer) {
   try {
@@ -98,7 +100,7 @@ router.post('/pdf', async (req, res) => {
       const pdfDoc = await loadingTask.promise;
 
       // Limit pages to first N to save time
-      const maxPages = Math.min(3, pdfDoc.numPages); // adjust as needed
+      const maxPages = Math.min(10, pdfDoc.numPages); // adjust as needed
       const imgBuffers = [];
       for (let p = 1; p <= maxPages; p++) {
         try {
@@ -124,6 +126,33 @@ router.post('/pdf', async (req, res) => {
   } catch (err) {
     console.error('extract/pdf error:', err);
     return res.status(500).json({ error: 'PDF extraction failed', details: String(err) });
+  }
+});
+
+module.exports = router;
+
+router.post('/youtube', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: 'No URL provided' });
+    }
+
+    // Extract transcript
+    const transcriptItems = await YoutubeTranscript.fetchTranscript(url);
+    
+    // Join all text parts into one string
+    const fullText = transcriptItems.map(item => item.text).join(' ');
+
+    res.json({ ok: true, transcript: fullText });
+
+  } catch (err) {
+    console.error('YouTube extraction error:', err);
+    // Handle disabled captions or invalid URLs
+    res.status(500).json({ 
+      error: 'Failed to extract captions. Make sure the video has captions enabled.',
+      details: String(err) 
+    });
   }
 });
 

@@ -6,6 +6,9 @@ import Leaderboard from './components/Leaderboard';
 
 // --- Config & constants ---
 
+// ✅ Corrected URL (matches your real Render server)
+const API_BASE_URL = "https://smart-quiz-master-x55k.onrender.com";
+
 const USERS_DB_KEY = "smartQuizUsers";
 const SKILLS_DB_PREFIX = "smartQuizSkills_";
 
@@ -59,7 +62,7 @@ const model = genAI ? genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) : 
 async function extractPdfFromServer(file) {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BACKEND_BASE}/api/extract/pdf`, { method: 'POST', body: form });
+  const res = await fetch(`${API_BASE_URL}/api/extract/pdf`, { method: 'POST', body: form });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'unknown' }));
     throw new Error(err.error || 'PDF extraction failed');
@@ -69,7 +72,7 @@ async function extractPdfFromServer(file) {
 }
 
 async function extractYoutubeFromServer(url) {
-  const res = await fetch(`${BACKEND_BASE}/api/extract/youtube`, {
+  const res = await fetch(`${API_BASE_URL}/api/extract/youtube`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
@@ -83,8 +86,7 @@ async function extractYoutubeFromServer(url) {
 }
 
 
-// ✅ Corrected URL (matches your real Render server)
-const API_BASE_URL = "https://smart-quiz-master-x55k.onrender.com";
+
 
 async function generateQuizFromAI(
   category, 

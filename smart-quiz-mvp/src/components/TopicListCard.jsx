@@ -1,4 +1,3 @@
-// src/components/TopicListCard.jsx
 import React, { useState } from "react";
 
 const TopicListCard = ({ title, topics, bgColor, textColor, icon }) => {

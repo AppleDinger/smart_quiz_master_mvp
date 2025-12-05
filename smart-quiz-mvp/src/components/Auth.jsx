@@ -24,17 +24,37 @@ export default function Auth({ onLogin }) {
     }
   };
 
+  // ✅ New helper to detect Enter key
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleAction(false); // Default to Login on Enter
+    }
+  };
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
         <h1 className="text-4xl font-black text-center mb-8 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">Smart Quiz</h1>
         <div className="space-y-4">
-          <input className="w-full p-4 border rounded-xl" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-          <input className="w-full p-4 border rounded-xl" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-          {error && <p className="text-red-500 text-center text-sm">{error}</p>}
+          <input 
+            className="w-full p-4 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none" 
+            placeholder="Username" 
+            value={username} 
+            onChange={e => setUsername(e.target.value)} 
+            onKeyDown={handleKeyDown} 
+          />
+          <input 
+            className="w-full p-4 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none" 
+            type="password" 
+            placeholder="Password" 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            onKeyDown={handleKeyDown} 
+          />
+          {error && <p className="text-red-500 text-center text-sm font-bold bg-red-50 p-2 rounded">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={() => handleAction(false)} className="flex-1 bg-orange-500 text-white font-bold py-3 rounded-xl hover:bg-orange-600">Login</button>
-            <button onClick={() => handleAction(true)} className="flex-1 bg-gray-100 font-bold py-3 rounded-xl hover:bg-gray-200">Register</button>
+            <button onClick={() => handleAction(false)} className="flex-1 bg-orange-500 text-white font-bold py-3 rounded-xl hover:bg-orange-600 transition-all active:scale-95">Login</button>
+            <button onClick={() => handleAction(true)} className="flex-1 bg-gray-100 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all active:scale-95">Register</button>
           </div>
         </div>
       </div>

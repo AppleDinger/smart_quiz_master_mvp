@@ -1,4 +1,3 @@
-// src/api.js
 const API_BASE_URL = "https://smart-quiz-master-x55k.onrender.com";
 
 export async function extractPdf(file) {

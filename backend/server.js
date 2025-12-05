@@ -156,3 +156,14 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+app.post("/api/sync-user", async (req, res) => {
+  try {
+    const { username, password, skills } = req.body;
+    await dataStore.updateUser(username, password, skills);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Sync failed" });
+  }
+});

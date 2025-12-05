@@ -459,20 +459,106 @@ function App() {
       <h1 className="text-4xl font-black text-center text-gray-800">Welcome, <span className="text-orange-500">{user.username}</span>!</h1>
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
         <h2 className="text-2xl font-bold mb-6">🚀 Start Quiz</h2>
-        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+        <div className="mb-6 flex flex-wrap gap-2">
           {['subject', 'pdf', 'youtube'].map(s => (
             <button key={s} onClick={() => setQuizSource(s)} className={`px-6 py-3 rounded-lg font-bold capitalize ${quizSource === s ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</button>
           ))}
         </div>
-        {quizSource === 'subject' && <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="w-full p-4 border rounded-xl mb-4 bg-white">{BTECH_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>}
-        {quizSource === 'pdf' && <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files[0])} className="w-full p-4 border border-dashed rounded-xl mb-4" />}
-        {quizSource === 'youtube' && <input type="text" placeholder="YouTube URL" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} className="w-full p-4 border rounded-xl mb-4" />}
-        <button onClick={() => handleStartQuiz()} disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-4 rounded-xl text-xl shadow-lg hover:to-red-700 disabled:opacity-50">
-          {loading ? 'Generating...' : 'Start Quiz'}
-        </button>
+        
+        <div className="space-y-6">
+          {quizSource === 'subject' && (
+            <>
+              <div>
+                <label className="block font-bold text-gray-700 mb-2">Subject</label>
+                <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="w-full p-4 border rounded-xl bg-white focus:ring-2 focus:ring-orange-300 outline-none">{BTECH_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+              </div>
+              {selectedSubject === 'Custom' && (
+                <div className="animate-fade-in">
+                  <label className="block font-bold text-gray-700 mb-2">Enter Topic</label>
+                  <input type="text" placeholder="e.g. 'Advanced React Hooks'" value={customSubject} onChange={e => setCustomSubject(e.target.value)} className="w-full p-4 border rounded-xl focus:ring-2 focus:ring-orange-300 outline-none" />
+                </div>
+              )}
+            </>
+          )}
+          {quizSource === 'pdf' && <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files[0])} className="w-full p-4 border border-dashed rounded-xl mb-4" />}
+          {quizSource === 'youtube' && <input type="text" placeholder="YouTube URL" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} className="w-full p-4 border rounded-xl mb-4" />}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block font-bold text-gray-700 mb-2">Questions</label>
+              <input type="number" value={numQuestions} onChange={e => setNumQuestions(e.target.value)} className="w-full p-3 border rounded-xl" min="5" max="50" />
+            </div>
+            <div>
+              <label className="block font-bold text-gray-700 mb-2">Extra Context (Optional)</label>
+              <textarea rows="1" placeholder="Focus on..." value={customContext} onChange={e => setCustomContext(e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-orange-300 outline-none" />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 bg-orange-50 p-4 rounded-xl border border-orange-100">
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700">
+              <input type="checkbox" checked={includeDescriptive} onChange={e => setIncludeDescriptive(e.target.checked)} className="w-5 h-5 text-orange-500 rounded" />
+              Include Written Answers
+            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700">
+                <input type="checkbox" checked={timerEnabled} onChange={e => setTimerEnabled(e.target.checked)} className="w-5 h-5 text-orange-500 rounded" />
+                Timer
+              </label>
+              {timerEnabled && <input type="number" value={timerDuration} onChange={e => setTimerDuration(e.target.value)} className="w-16 p-1 border rounded text-center" placeholder="Min" />}
+            </div>
+          </div>
+
+          <button onClick={() => handleStartQuiz()} disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-4 rounded-xl text-xl shadow-lg hover:to-red-700 disabled:opacity-50">
+            {loading ? 'Generating...' : 'Start Quiz'}
+          </button>
+        </div>
       </div>
     </div>
   );
+
+  const renderMultiTopicSetupModal = () => {
+    if (!isMultiQuizModalOpen || !multiQuizSkills) return null;
+    return (
+      <div className="fixed inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-lg border-t-8 border-orange-500 mx-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-4 text-gray-800">Setup Multi-Topic Quiz</h2>
+          <p className="mb-6 text-gray-600">Covering {multiQuizSkills.length} topics.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Number of Questions</label>
+              <input type="number" value={numQuestions} min="5" max="50" onChange={(e) => setNumQuestions(e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-orange-300 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Focus Instructions</label>
+              <textarea rows="2" placeholder="Optional focus..." value={customContext} onChange={(e) => setCustomContext(e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-orange-300 outline-none" />
+            </div>
+            
+            {/* RESTORED SETTINGS FOR MULTI-TOPIC */}
+            <div className="flex flex-wrap gap-4 bg-orange-50 p-4 rounded-xl border border-orange-100">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-sm">
+                <input type="checkbox" checked={includeDescriptive} onChange={e => setIncludeDescriptive(e.target.checked)} className="w-4 h-4 text-orange-500 rounded" />
+                Written Answers
+              </label>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-sm">
+                  <input type="checkbox" checked={timerEnabled} onChange={e => setTimerEnabled(e.target.checked)} className="w-4 h-4 text-orange-500 rounded" />
+                  Timer
+                </label>
+                {timerEnabled && <input type="number" value={timerDuration} onChange={e => setTimerDuration(e.target.value)} className="w-16 p-1 border rounded text-center text-sm" placeholder="Min" />}
+              </div>
+            </div>
+
+          </div>
+          <div className="flex justify-end gap-3 mt-8">
+            <button onClick={() => setIsMultiQuizModalOpen(false)} className="bg-gray-100 text-gray-700 font-bold py-2 px-5 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+            <button onClick={() => handleStartQuiz(multiQuizSkills)} disabled={loading} className="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 transition-colors shadow-md">
+              {loading ? 'Generating...' : 'Start Quiz'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-orange-50 font-sans text-gray-800 pb-10">
@@ -488,14 +574,7 @@ function App() {
       <main className="container mx-auto p-4 md:p-8 max-w-5xl">
         {!user ? renderLogin() : (page === 'quiz' ? renderQuiz() : page === 'dashboard' ? <DashboardComponent skills={skills} lastQuizSummary={lastQuizSummary} onDownloadQuiz={handleDownloadQuiz} onSetupMultiQuiz={s => { setMultiQuizSkills(s); setIsMultiQuizModalOpen(true); }} /> : page === 'leaderboard' ? <Leaderboard onClose={() => setPage('dashboard')} apiBase={API_BASE_URL} /> : renderHome())}
       </main>
-      {isMultiQuizModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-8 rounded-2xl w-full max-w-lg">
-            <h2 className="text-2xl font-bold mb-4">Multi-Topic Quiz</h2>
-            <div className="flex justify-end gap-3 mt-6"><button onClick={() => setIsMultiQuizModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded-lg">Cancel</button><button onClick={() => handleStartQuiz(multiQuizSkills)} className="px-4 py-2 bg-orange-500 text-white rounded-lg">Start</button></div>
-          </div>
-        </div>
-      )}
+      {renderMultiTopicSetupModal()}
     </div>
   );
 }

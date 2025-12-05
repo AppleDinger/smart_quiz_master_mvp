@@ -6,7 +6,7 @@ import Leaderboard from './components/Leaderboard';
 
 // --- Config & constants ---
 
-// ✅ Corrected URL (matches your real Render server)
+// ✅ Corrected URL
 const API_BASE_URL = "https://smart-quiz-master-x55k.onrender.com";
 
 const USERS_DB_KEY = "smartQuizUsers";
@@ -27,7 +27,7 @@ const BTECH_SUBJECTS = [
   'Chemistry for Engineers', 'Custom'
 ];
 
-// --- Skill update helper ---
+// --- Helper Functions (Same as before) ---
 function updateSkill(skillRecord, score) {
   const oldScore = skillRecord?.score ?? SKILL_INIT_SCORE;
   const oldDays = skillRecord?.intervalDays ?? SKILL_INIT_DAYS;
@@ -52,13 +52,11 @@ function updateSkill(skillRecord, score) {
   };
 }
 
-// --- Initialize LLM client ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) console.error("VITE_GEMINI_API_KEY not found. LLM calls will fail if missing.");
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 const model = genAI ? genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) : null;
 
-// --- Backend extraction helpers ---
 async function extractPdfFromServer(file) {
   const form = new FormData();
   form.append('file', file);
@@ -153,9 +151,9 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
 
   if (Object.keys(skills).length === 0 && !lastQuizSummary) {
     return (
-      <div className="bg-white p-8 rounded-xl shadow-lg text-center border-t-4 border-orange-400">
-        <h2 className="text-3xl font-bold mb-4 text-gray-800">Your Skill Dashboard</h2>
-        <p className="text-gray-600 text-lg">Complete your first quiz to see your stats here!</p>
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg text-center border-t-4 border-orange-400 mx-4 md:mx-0">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-gray-800">Your Skill Dashboard</h2>
+        <p className="text-gray-600 text-base md:text-lg">Complete your first quiz to see your stats here!</p>
       </div>
     );
   }
@@ -175,7 +173,7 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
       ) : (
         <ul className="list-disc list-inside space-y-2">
           {topics.slice(0, 5).map(([name, data]) => (
-            <li key={name} className="capitalize text-gray-700 font-medium">
+            <li key={name} className="capitalize text-gray-700 font-medium text-sm md:text-base">
               {name} <span className="text-xs font-bold opacity-60 ml-1">({Math.round(data.score * 100)}%)</span>
             </li>
           ))}
@@ -188,28 +186,28 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
   return (
     <>
       {lastQuizSummary && (
-        <div className="bg-white p-6 rounded-xl shadow-md mb-8 border-l-4 border-orange-500">
+        <div className="bg-white p-5 md:p-6 rounded-xl shadow-md mb-8 border-l-4 border-orange-500 mx-2 md:mx-0">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Last Quiz Summary</h2>
-              <p className="text-lg text-gray-600 truncate max-w-md" title={lastQuizSummary.category}>
+            <div className="w-full">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">Last Quiz Summary</h2>
+              <p className="text-base md:text-lg text-gray-600 truncate max-w-md" title={lastQuizSummary.category}>
                 Topic: <span className="font-semibold text-orange-600">{lastQuizSummary.category.split(':').pop().trim()}</span>
               </p>
             </div>
             <button
               onClick={onDownloadQuiz}
-              className="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 transition-all shadow-md hover:shadow-lg"
+              className="w-full md:w-auto bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 transition-all shadow-md hover:shadow-lg text-sm md:text-base"
             >
               Download PDF Report
             </button>
           </div>
           {lastQuizStats && lastQuizStats.total > 0 && (
             <div className="mt-4 flex items-center gap-4 bg-orange-50 p-4 rounded-lg border border-orange-100">
-              <div className="text-4xl font-black text-orange-600">
+              <div className="text-3xl md:text-4xl font-black text-orange-600">
                 {lastQuizStats.correct}/{lastQuizStats.total}
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-700 uppercase tracking-wider">Score</p>
+                <p className="text-xs md:text-sm font-bold text-gray-700 uppercase tracking-wider">Score</p>
                 <p className="text-sm text-gray-500 font-medium">
                   {Math.round((lastQuizStats.correct / lastQuizStats.total) * 100)}% Accuracy
                 </p>
@@ -219,27 +217,27 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-2 border-gray-100">Your Skill Dashboard</h2>
+      <div className="bg-white p-5 md:p-6 rounded-xl shadow-lg mx-2 md:mx-0">
+        <h2 className="text-xl md:text-2xl font-bold mb-6 text-gray-800 border-b pb-2 border-gray-100">Your Skill Dashboard</h2>
         <input
           type="text"
           placeholder="🔍 Search your skills..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full p-4 border border-gray-200 rounded-xl mb-6 focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all outline-none bg-gray-50"
+          className="w-full p-3 md:p-4 border border-gray-200 rounded-xl mb-6 focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all outline-none bg-gray-50"
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-xl text-center border border-orange-100">
-            <div className="text-5xl font-black text-orange-500 mb-2">{Math.round(averageScore * 100)}%</div>
-            <div className="text-sm font-bold text-gray-500 uppercase tracking-wide">Overall Mastery</div>
+            <div className="text-4xl md:text-5xl font-black text-orange-500 mb-2">{Math.round(averageScore * 100)}%</div>
+            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide">Overall Mastery</div>
           </div>
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl text-center border border-gray-200">
-            <div className="text-5xl font-black text-gray-700 mb-2">{totalSkills}</div>
-            <div className="text-sm font-bold text-gray-500 uppercase tracking-wide">Skills Practiced</div>
+            <div className="text-4xl md:text-5xl font-black text-gray-700 mb-2">{totalSkills}</div>
+            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide">Skills Practiced</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {renderTopicList("💪 Strong Topics", strongTopics, "bg-green-50", "text-green-700")}
           {renderTopicList("🧠 Needs Focus", weakTopics, "bg-red-50", "text-red-700")}
         </div>
@@ -253,7 +251,7 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
               <button
                 key={`select_${skillName}`}
                 onClick={() => handleSkillSelect(skillName)}
-                className={`py-1.5 px-4 text-sm rounded-full capitalize transition-all shadow-sm duration-200 border
+                className={`py-1.5 px-3 md:px-4 text-xs md:text-sm rounded-full capitalize transition-all shadow-sm duration-200 border
                   ${selectedQuizSkills[skillName] 
                     ? 'bg-orange-500 text-white border-orange-600 scale-105' 
                     : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:text-orange-500'}
@@ -268,9 +266,9 @@ function DashboardComponent({ skills, lastQuizSummary, onDownloadQuiz, onSetupMu
           <button
             onClick={() => onSetupMultiQuiz(selectedSkillsArray)}
             disabled={selectedSkillsArray.length === 0}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-4 px-8 rounded-xl text-lg hover:from-orange-600 hover:to-red-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg transform transition active:scale-[0.99]"
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3 md:py-4 px-8 rounded-xl text-base md:text-lg hover:from-orange-600 hover:to-red-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg transform transition active:scale-[0.99]"
           >
-            Generate Quiz from {selectedSkillsArray.length} Selected Topics
+            Generate Quiz ({selectedSkillsArray.length} Topics)
           </button>
         </div>
       </div>
@@ -349,7 +347,6 @@ function App() {
     setPage('home');
   };
 
-  // Handle Enter key for login
   const handleAuthKeyDown = (e) => {
     if (e.key === 'Enter') handleLogin();
   };
@@ -613,8 +610,8 @@ function App() {
     if (!isMultiQuizModalOpen || !multiQuizSkills) return null;
     return (
       <div className="fixed inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-lg border-t-8 border-orange-500">
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">Setup Multi-Topic Quiz</h2>
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-lg border-t-8 border-orange-500 mx-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-4 text-gray-800">Setup Multi-Topic Quiz</h2>
           <p className="mb-6 text-gray-600">Covering {multiQuizSkills.length} topics.</p>
           <div className="space-y-4">
             <div>
@@ -638,10 +635,10 @@ function App() {
   };
 
   const renderLoginScreen = () => (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+    <div className="min-h-[80vh] flex items-center justify-center p-4">
+      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 mb-2">Smart Quiz</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 mb-2">Smart Quiz</h1>
           <p className="text-gray-500 font-medium">Master your skills with AI</p>
         </div>
         <div className="space-y-4">
@@ -651,7 +648,7 @@ function App() {
             value={usernameInput}
             onChange={(e) => setUsernameInput(e.target.value)}
             onKeyDown={handleAuthKeyDown}
-            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all bg-gray-50"
+            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all bg-gray-50 text-base md:text-lg"
           />
           <input
             type="password"
@@ -659,12 +656,12 @@ function App() {
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
             onKeyDown={handleAuthKeyDown}
-            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all bg-gray-50"
+            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all bg-gray-50 text-base md:text-lg"
           />
           {authError && <p className="text-red-500 text-sm font-semibold bg-red-50 p-2 rounded-lg text-center">{authError}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleLogin} className="flex-1 bg-orange-500 text-white font-bold py-3 px-4 rounded-xl hover:bg-orange-600 transition-all shadow-md active:scale-95">Login</button>
-            <button onClick={handleRegister} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-all active:scale-95">Register</button>
+            <button onClick={handleLogin} className="flex-1 bg-orange-500 text-white font-bold py-3 px-4 rounded-xl hover:bg-orange-600 transition-all shadow-md active:scale-95 text-base md:text-lg">Login</button>
+            <button onClick={handleRegister} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-all active:scale-95 text-base md:text-lg">Register</button>
           </div>
         </div>
       </div>
@@ -672,25 +669,25 @@ function App() {
   );
 
   const renderHomeScreen = () => (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center mb-10">
-        <h1 className="text-5xl font-black text-gray-800 mb-2">Welcome, <span className="text-orange-500">{user.username}</span>!</h1>
-        <p className="text-xl text-gray-500">Ready to challenge yourself today?</p>
+    <div className="space-y-6 md:space-y-8 animate-fade-in mx-2 md:mx-0">
+      <div className="text-center mb-6 md:mb-10">
+        <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">Welcome, <span className="text-orange-500">{user.username}</span>!</h1>
+        <p className="text-lg md:text-xl text-gray-500">Ready to challenge yourself today?</p>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-          <span className="text-3xl">🚀</span> Start a New Quiz
+      <div className="bg-white p-5 md:p-8 rounded-2xl shadow-xl border border-gray-100">
+        <h2 className="text-xl md:text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+          <span className="text-2xl md:text-3xl">🚀</span> Start a New Quiz
         </h2>
 
         <div className="mb-6">
           <label className="block text-sm font-bold text-gray-600 mb-2 uppercase tracking-wide">Source Material</label>
-          <div className="flex rounded-xl bg-gray-100 p-1">
+          <div className="flex flex-wrap md:flex-nowrap rounded-xl bg-gray-100 p-1">
             {['subject', 'pdf', 'youtube'].map((src) => (
               <button
                 key={src}
                 onClick={() => setQuizSource(src)}
-                className={`flex-1 py-3 rounded-lg font-bold capitalize transition-all duration-200 ${
+                className={`flex-1 py-3 rounded-lg font-bold capitalize transition-all duration-200 text-sm md:text-base mb-1 md:mb-0 ${
                   quizSource === src ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -705,7 +702,7 @@ function App() {
             <>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Subject</label>
-                <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none bg-gray-50 cursor-pointer hover:bg-white transition-colors">
+                <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full p-3 md:p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none bg-gray-50 cursor-pointer hover:bg-white transition-colors">
                   {BTECH_SUBJECTS.map(subject => (<option key={subject} value={subject}>{subject}</option>))}
                 </select>
               </div>
@@ -720,8 +717,8 @@ function App() {
               <input type="file" accept="application/pdf" onChange={(e) => setPdfFile(e.target.files[0])} className="hidden" id="pdf-upload" />
               <label htmlFor="pdf-upload" className="cursor-pointer flex flex-col items-center gap-2">
                 <span className="text-4xl">📄</span>
-                <span className="font-bold text-gray-600">{pdfFile ? pdfFile.name : "Click to Upload PDF"}</span>
-                {!pdfFile && <span className="text-sm text-gray-400">Supported format: .pdf</span>}
+                <span className="font-bold text-gray-600 text-sm md:text-base">{pdfFile ? pdfFile.name : "Click to Upload PDF"}</span>
+                {!pdfFile && <span className="text-xs md:text-sm text-gray-400">Supported format: .pdf</span>}
               </label>
             </div>
           )}
@@ -744,21 +741,23 @@ function App() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-6 bg-orange-50 p-4 rounded-xl border border-orange-100">
+          <div className="flex flex-col md:flex-row flex-wrap gap-4 md:gap-6 bg-orange-50 p-4 rounded-xl border border-orange-100">
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={includeDescriptive} onChange={(e) => setIncludeDescriptive(e.target.checked)} className="w-5 h-5 text-orange-500 rounded focus:ring-orange-400 border-gray-300" />
-              <span className="font-medium text-gray-700">Include Written Answers</span>
+              <span className="font-medium text-gray-700 text-sm md:text-base">Include Written Answers</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={timerEnabled} onChange={(e) => setTimerEnabled(e.target.checked)} className="w-5 h-5 text-orange-500 rounded focus:ring-orange-400 border-gray-300" />
-              <span className="font-medium text-gray-700">Timer</span>
-            </label>
-            {timerEnabled && (
-              <input type="number" value={timerDuration} onChange={(e) => setTimerDuration(e.target.value)} className="w-20 p-1 border rounded text-center ml-auto" placeholder="Min" />
-            )}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={timerEnabled} onChange={(e) => setTimerEnabled(e.target.checked)} className="w-5 h-5 text-orange-500 rounded focus:ring-orange-400 border-gray-300" />
+                <span className="font-medium text-gray-700 text-sm md:text-base">Timer</span>
+              </label>
+              {timerEnabled && (
+                <input type="number" value={timerDuration} onChange={(e) => setTimerDuration(e.target.value)} className="w-20 p-1 border rounded text-center ml-auto" placeholder="Min" />
+              )}
+            </div>
           </div>
 
-          <button onClick={() => handleStartQuiz()} disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-4 px-8 rounded-xl text-xl hover:from-orange-600 hover:to-red-700 disabled:opacity-50 shadow-lg transform transition active:scale-[0.99]">
+          <button onClick={() => handleStartQuiz()} disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-3 md:py-4 px-8 rounded-xl text-lg md:text-xl hover:from-orange-600 hover:to-red-700 disabled:opacity-50 shadow-lg transform transition active:scale-[0.99]">
             {loading ? '🔮 Generating Quiz...' : '🚀 Start Quiz'}
           </button>
         </div>
@@ -775,26 +774,26 @@ function App() {
     const question = quizData.questions[currentQIndex];
 
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <span className="bg-orange-100 text-orange-700 px-4 py-1 rounded-full text-sm font-bold uppercase tracking-wider">
+      <div className="max-w-4xl mx-auto px-2 md:px-0">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-2">
+          <span className="bg-orange-100 text-orange-700 px-3 md:px-4 py-1 rounded-full text-xs md:text-sm font-bold uppercase tracking-wider truncate max-w-full">
             {quizData.category.split(':').pop().trim()}
           </span>
           {isQuizTimed && (
-            <div className={`text-2xl font-mono font-bold px-4 py-2 rounded-lg ${timeLeft < 30 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-700'}`}>
+            <div className={`text-xl md:text-2xl font-mono font-bold px-4 py-2 rounded-lg ${timeLeft < 30 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-700'}`}>
               {formatTime(timeLeft)}
             </div>
           )}
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow-xl border-t-8 border-orange-500 relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-gray-100 px-4 py-2 rounded-bl-xl text-gray-500 font-bold text-sm">
+        <div className="bg-white p-5 md:p-8 rounded-2xl shadow-xl border-t-8 border-orange-500 relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-gray-100 px-3 md:px-4 py-1 md:py-2 rounded-bl-xl text-gray-500 font-bold text-xs md:text-sm">
             {currentQIndex + 1} / {quizData.questions.length}
           </div>
           
-          <h2 className="text-2xl font-bold mb-8 text-gray-800 pr-12 leading-relaxed">{question.prompt}</h2>
+          <h2 className="text-xl md:text-2xl font-bold mb-6 md:mb-8 text-gray-800 pr-12 leading-relaxed">{question.prompt}</h2>
 
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {question.type === 'mcq' ? (
               question.choices.map((choice, index) => {
                 const choiceId = `q_${question.id}_choice_${index}`;
@@ -803,17 +802,17 @@ function App() {
                   <label 
                     key={choiceId} 
                     htmlFor={choiceId} 
-                    className={`flex items-center p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 group
+                    className={`flex items-center p-4 md:p-5 rounded-xlWZ border-2 cursor-pointer transition-all duration-200 group
                       ${isSelected 
                         ? 'bg-orange-50 border-orange-500 ring-1 ring-orange-500' 
                         : 'border-gray-200 hover:border-orange-300 hover:bg-gray-50'
                       } ${feedback ? 'cursor-default opacity-90' : ''}`}
                   >
                     <input type="radio" id={choiceId} name={question.id} value={choice} checked={isSelected} onChange={(e) => setSelectedAnswer(e.target.value)} disabled={!!feedback} className="hidden" />
-                    <span className={`w-8 h-8 flex items-center justify-center rounded-full mr-4 font-bold text-sm transition-colors ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600 group-hover:bg-gray-300'}`}>
+                    <span className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full mr-3 md:mr-4 font-bold text-sm transition-colors ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600 group-hover:bg-gray-300'}`}>
                       {['A','B','C','D'][index]}
                     </span>
-                    <span className="text-lg text-gray-700 font-medium">{choice}</span>
+                    <span className="text-base md:text-lg text-gray-700 font-medium">{choice}</span>
                   </label>
                 );
               })
@@ -823,19 +822,19 @@ function App() {
           </div>
 
           {!feedback && (
-            <button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="mt-8 w-full bg-gray-800 text-white font-bold py-4 px-6 rounded-xl hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="mt-6 md:mt-8 w-full bg-gray-800 text-white font-bold py-3 md:py-4 px-6 rounded-xl hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed text-base md:text-lg">
               Submit Answer ↵
             </button>
           )}
         </div>
 
         {feedback && (
-          <div className={`mt-6 p-6 rounded-2xl shadow-lg border-l-8 animate-slide-up ${feedback.score > 0 ? 'bg-green-50 border-green-500 text-green-900' : 'bg-red-50 border-red-500 text-red-900'}`}>
-            <h3 className="font-black text-2xl mb-2 flex items-center gap-2">
+          <div className={`mt-6 p-5 md:p-6 rounded-2xl shadow-lg border-l-8 animate-slide-up ${feedback.score > 0 ? 'bg-green-50 border-green-500 text-green-900' : 'bg-red-50 border-red-500 text-red-900'}`}>
+            <h3 className="font-black text-xl md:text-2xl mb-2 flex items-center gap-2">
               {feedback.score > 0 ? '🎉 Correct!' : '❌ Incorrect'}
             </h3>
-            <p className="text-lg leading-relaxed opacity-90">{feedback.explanation}</p>
-            <button onClick={handleNextQuestion} className={`mt-6 font-bold py-3 px-8 rounded-xl shadow-md text-white transition-transform active:scale-95 ${feedback.score > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+            <p className="text-base md:text-lg leading-relaxed opacity-90">{feedback.explanation}</p>
+            <button onClick={handleNextQuestion} className={`mt-4 md:mt-6 font-bold py-3 px-8 rounded-xl shadow-md text-white transition-transform active:scale-95 w-full md:w-auto ${feedback.score > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
               {currentQIndex === quizData.questions.length - 1 ? 'See Results' : 'Next Question ➡'}
             </button>
           </div>
@@ -845,10 +844,10 @@ function App() {
   };
 
   const renderDashboardScreen = () => (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in mx-2 md:mx-0">
       <DashboardComponent skills={skills} lastQuizSummary={lastQuizSummary} onDownloadQuiz={handleDownloadQuiz} onSetupMultiQuiz={handleSetupMultiQuiz} />
       <div className="flex justify-center mt-8">
-        <button onClick={() => setPage('home')} className="bg-gray-800 text-white font-bold py-3 px-8 rounded-xl hover:bg-black transition-all shadow-lg flex items-center gap-2">
+        <button onClick={() => setPage('home')} className="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-xl hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2 text-base md:text-lg">
           <span>🔄</span> Take Another Quiz
         </button>
       </div>
@@ -866,28 +865,28 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-orange-50 font-sans text-gray-800 selection:bg-orange-200">
+    <div className="min-h-screen bg-orange-50 font-sans text-gray-800 selection:bg-orange-200 pb-10">
       <nav className="bg-white shadow-sm border-b border-orange-100 sticky top-0 z-40">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <button onClick={() => setPage('home')} className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <span className="text-3xl">🧠</span>
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex flex-wrap md:flex-nowrap justify-between items-center">
+          <button onClick={() => setPage('home')} className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2">
+            <span className="text-2xl md:text-3xl">🧠</span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">SmartQuiz</span>
           </button>
           
-          <div className="flex items-center gap-4 text-sm font-bold">
-            <button onClick={() => setPage('leaderboard')} className="text-gray-500 hover:text-orange-600 transition-colors">🏆 Leaderboard</button>
+          <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm font-bold mt-2 md:mt-0 w-full md:w-auto justify-end">
+            <button onClick={() => setPage('leaderboard')} className="text-gray-500 hover:text-orange-600 transition-colors px-2">🏆 <span className="hidden sm:inline">Leaderboard</span></button>
             {user && (
               <>
-                <button onClick={() => setPage('dashboard')} className="text-gray-500 hover:text-orange-600 transition-colors">📊 Dashboard</button>
-                <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
-                <button onClick={handleLogout} className="text-red-500 hover:text-red-700 transition-colors">Logout</button>
+                <button onClick={() => setPage('dashboard')} className="text-gray-500 hover:text-orange-600 transition-colors px-2">📊 <span className="hidden sm:inline">Dashboard</span></button>
+                <div className="h-4 md:h-6 w-px bg-gray-200"></div>
+                <button onClick={handleLogout} className="text-red-500 hover:text-red-700 transition-colors px-2">Logout</button>
               </>
             )}
           </div>
         </div>
       </nav>
 
-      <main className="container mx-auto p-4 md:p-8 max-w-5xl">
+      <main className="container mx-auto p-2 md:p-8 max-w-5xl">
         {renderPage()}
       </main>
 

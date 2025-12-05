@@ -23,9 +23,10 @@ app.use(fileUpload({ useTempFiles: false }));
 let dataStore;
 try {
   dataStore = require("./data-store");
-  dataStore.init().catch(console.error);
+  // This line starts the connection when server loads
+  dataStore.init().catch(console.error); 
 } catch (err) {
-  console.warn("data-store not found or failed to init (OK for early dev):", err?.message || err);
+  console.warn("data-store failed to load:", err);
 }
 
 // --- ROUTES ---

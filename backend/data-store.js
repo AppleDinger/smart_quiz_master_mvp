@@ -1,11 +1,11 @@
 // backend/data-store.js
 const mongoose = require('mongoose');
 
-// Define the shape of your data (Schema)
+// 1. Define the User Schema
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  password: { type: String }, // In a real app, hash this!
-  skills: { type: Object, default: {} }, // Stores your skill scores
+  password: { type: String },
+  skills: { type: Object, default: {} },
   attempts: [{
     id: String,
     correct: Number,
@@ -14,69 +14,72 @@ const UserSchema = new mongoose.Schema({
   }]
 });
 
-// Create the Model
 const User = mongoose.model('User', UserSchema);
 
-// --- Functions ---
-
-// 1. Initialize Connection
+// 2. Initialize Connection
 async function init() {
   const uri = process.env.MONGO_URI;
   if (!uri) {
-    console.error("❌ MONGO_URI is missing in Environment Variables!");
+    console.error("❌ CRITICAL: MONGO_URI is missing in Environment Variables!");
     return;
   }
   
   try {
-    await mongoose.connect(uri);
-    console.log("✅ Connected to MongoDB Atlas");
+    // Connect to specific database 'smartquiz_db'
+    await mongoose.connect(uri, { dbName: 'smartquiz_db' });
+    console.log("✅ Connected to MongoDB Atlas (smartquiz_db)");
   } catch (err) {
     console.error("❌ MongoDB Connection Error:", err);
   }
 }
 
-// 2. Save a Quiz Attempt
+// 3. Save Attempt Function
 async function saveAttempt(username, attempt) {
-  // Find user, creating them if they don't exist (Upsert logic)
-  let user = await User.findOne({ username });
-  
-  if (!user) {
-    // Auto-register if user not found (matches your previous logic)
-    user = new User({ username, password: "123", attempts: [] });
+  try {
+    let user = await User.findOne({ username });
+    
+    // Create user if not exists
+    if (!user) {
+      console.log(`Creating new user: ${username}`);
+      user = new User({ username, password: "default123", attempts: [] });
+    }
+
+    // Add attempt
+    user.attempts.push({
+      id: String(Date.now()),
+      correct: attempt.correct,
+      numQuestions: attempt.numQuestions
+    });
+
+    await user.save();
+    console.log(`✅ Saved attempt for ${username}`);
+    return user;
+  } catch (e) {
+    console.error("Error saving attempt:", e);
+    throw e;
   }
-
-  // Add the attempt
-  user.attempts.push({
-    id: String(Date.now()), // Simple ID
-    correct: attempt.correct,
-    numQuestions: attempt.numQuestions
-  });
-
-  await user.save();
-  return user;
 }
 
-// 3. Get All Users (For Leaderboard)
+// 4. Get All Users (For Leaderboard)
 async function getAllUsers() {
-  // Return plain JSON objects
   return await User.find().lean();
 }
 
-// 4. Update User Skills/Password (For Login Sync)
+// 5. Update User (For Sync)
 async function updateUser(username, password, skills) {
-  let user = await User.findOne({ username });
-
-  if (!user) {
-    user = new User({ username, password, skills });
-  } else {
-    if (password) user.password = password;
-    // Merge new skills with existing ones
-    if (skills) {
-      user.skills = { ...user.skills, ...skills };
+  try {
+    let user = await User.findOne({ username });
+    if (!user) {
+      user = new User({ username, password, skills });
+    } else {
+      if (password) user.password = password;
+      if (skills) user.skills = { ...user.skills, ...skills };
     }
+    await user.save();
+    console.log(`✅ Synced data for ${username}`);
+  } catch (e) {
+    console.error("Error syncing user:", e);
   }
-  
-  await user.save();
 }
 
 module.exports = { init, saveAttempt, getAllUsers, updateUser };

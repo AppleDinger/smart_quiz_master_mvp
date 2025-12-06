@@ -119,10 +119,40 @@ Once you run npm run dev, open the local link (usually http://localhost:5173) in
 ###The Split-Hosting Strategy ☁️
 This app uses a modern Split-Hosting architecture to ensure security and performance on the free tier.
 
-<div align="center"> <img src="https://www.google.com/search?q=https://via.placeholder.com/800x300.png%3Ftext%3DFrontend(GitHub)%2B%253C-%253E%2BBackend(Render)%2B%253C-%253E%2BDB(Atlas)" alt="Architecture Diagram" width="100%" />
+## Architecture Overview
 
+### The Split-Hosting Strategy ☁️
 
-</div>
+This app uses a modern **Split-Hosting** architecture to ensure security and performance on the free tier.
+
+```mermaid
+graph TD
+    subgraph Client_Side [Frontend - GitHub Pages]
+        UI[React + Vite UI]
+        State[Skill Tracking State]
+    end
+
+    subgraph Server_Side [Backend - Render Free Tier]
+        API[Node.js Express API]
+        Auth[Auth Middleware]
+        Parser[PDF & Text Parser]
+    end
+
+    subgraph Cloud_Services [External Services]
+        DB[(MongoDB Atlas)]
+        AI[Google Gemini 2.5]
+        YT[YouTube Data]
+    end
+
+    UI -->|HTTPS Fetch| API
+    API -->|Validation| Auth
+    Auth -->|Read/Write User Data| DB
+    API -->|Generate Content| AI
+    API -->|Extract Transcript| YT
+    
+    style Client_Side fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style Server_Side fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Cloud_Services fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
 
 Frontend: Hosted on GitHub Pages. It handles the UI, State Management, and PDF generation.
 

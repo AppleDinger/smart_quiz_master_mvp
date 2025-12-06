@@ -153,6 +153,7 @@ graph TD
     style Client_Side fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     style Server_Side fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     style Cloud_Services fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+```
 
 Frontend: Hosted on GitHub Pages. It handles the UI, State Management, and PDF generation.
 

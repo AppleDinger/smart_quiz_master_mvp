@@ -87,3 +87,52 @@ $ npm install
 # Create environment file (Windows)
 $ type nul > .env
 ```
+Open the .env file and add your keys:
+```in env file
+PORT=4000
+GEMINI_API_KEY=your_api_key
+MONGO_URI=your_mongodb_connection_string
+```
+Then start the server:
+
+```bash
+# Run the server
+$ node server.js
+```
+Step 2: Setup Frontend
+Open a new terminal window and set up the React client.
+```bash
+# Go into frontend folder
+$ cd smart-quiz-mvp
+
+# Install dependencies
+$ npm install
+
+# Run the app
+$ npm run dev
+```
+Once you run npm run dev, open the local link (usually http://localhost:5173) in your browser.
+
+----
+
+##Architecture Overview
+###The Split-Hosting Strategy ☁️
+This app uses a modern Split-Hosting architecture to ensure security and performance on the free tier.
+
+<div align="center"> <img src="https://www.google.com/search?q=https://via.placeholder.com/800x300.png%3Ftext%3DFrontend(GitHub)%2B%253C-%253E%2BBackend(Render)%2B%253C-%253E%2BDB(Atlas)" alt="Architecture Diagram" width="100%" />
+
+
+</div>
+
+Frontend: Hosted on GitHub Pages. It handles the UI, State Management, and PDF generation.
+
+Backend: Hosted on Render. It protects the API Keys, handles OCR processing, and talks to the AI.
+
+Database: Hosted on MongoDB Atlas. It permanently stores user profiles, quiz history, and skill statistics.
+
+----
+Author 👨‍💻
+Ram Mishra - Linkedin, Github
+
+Note:
+I'm currently looking for Software Engineering Opportunities or Internships. If you like this project, feel free to reach out to me via LinkedIn! 🙌

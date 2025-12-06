@@ -36,7 +36,7 @@ export default function Quiz({ data, settings, onFinish, onUpdateSkills }) {
     }
   };
 
-  // ✅ Keyboard Listeners
+  // ✅Keyboard Listeners
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
@@ -54,10 +54,12 @@ export default function Quiz({ data, settings, onFinish, onUpdateSkills }) {
       // Numbers 1-4: Select options A-D (only if no feedback yet)
       if (!feedback && q.type === 'mcq') {
         let choiceIndex = -1;
-        if (key === '1') choiceIndex = 0;
-        if (key === '2') choiceIndex = 1;
-        if (key === '3') choiceIndex = 2;
-        if (key === '4') choiceIndex = 3;
+        const k = key.toLowerCase(); // Normalize to lowercase once
+
+          if (k === '1' || k === 'a') choiceIndex = 0;
+          if (k === '2' || k === 'b') choiceIndex = 1;
+          if (k === '3' || k === 'c') choiceIndex = 2;
+          if (k === '4' || k === 'd') choiceIndex = 3;
 
         if (choiceIndex !== -1 && q.choices[choiceIndex]) {
           setAnswer(q.choices[choiceIndex]);

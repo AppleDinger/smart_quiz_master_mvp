@@ -1,4 +1,3 @@
-// src/components/Leaderboard.jsx
 import React, { useEffect, useState } from "react";
 
 export default function Leaderboard({ onClose, apiBase }) {
@@ -6,7 +5,6 @@ export default function Leaderboard({ onClose, apiBase }) {
   const [error, setError] = useState(null);
   const [rows, setRows] = useState([]);
   const [period, setPeriod] = useState("all");
-  // 1. New State for Sorting
   const [sortBy, setSortBy] = useState("score"); // 'score' or 'accuracy'
 
   async function loadLeaderboard(selectedPeriod = "all") {
@@ -45,7 +43,7 @@ export default function Leaderboard({ onClose, apiBase }) {
     }
   }, [period, apiBase]);
 
-  // 2. Logic to sort rows based on selection
+  //Logic to sort rows based on selection
   const getSortedRows = () => {
     // Create a copy to avoid mutating state directly
     const sorted = [...rows];

@@ -1,4 +1,3 @@
-// backend/routes/extract.js
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
@@ -136,7 +135,7 @@ router.post('/pdf', async (req, res) => {
   }
 });
 
-// 2. YOUTUBE EXTRACTION (Fixed Logic)
+// 2. YOUTUBE EXTRACTION
 router.post('/youtube', async (req, res) => {
   try {
     const { url } = req.body;
@@ -153,7 +152,6 @@ router.post('/youtube', async (req, res) => {
     console.log(`Fetching transcript for Video ID: ${videoId}`);
 
     // Step B: Fetch Transcript (Any Language)
-    // REMOVED { lang: 'en' } to allow auto-generated captions
     const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
     
     // Step C: Combine Text

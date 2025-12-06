@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config(); // Load environment variables
 const express = require("express");
 const cors = require("cors");
@@ -36,8 +35,7 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running!" });
 });
 
-// 2. GENERATE QUIZ ROUTE (The new secure route)
-// server.js (Updated Route)
+// 2. GENERATE QUIZ ROUTE 
 
 app.post("/api/generate-quiz", async (req, res) => {
   try {
@@ -118,7 +116,6 @@ app.post("/api/generate-quiz", async (req, res) => {
   }
 });
 
-// 3. EXISTING ROUTES (Keep your existing logic)
 // --- ROUTES ---
 
 // HEALTH CHECK
@@ -152,7 +149,7 @@ try {
 } catch (err) { console.warn("leaderboard route missing"); }
 
 
-// ✅ CORRECT
+// CORRECT
 const PORT = process.env.PORT || 4000; 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

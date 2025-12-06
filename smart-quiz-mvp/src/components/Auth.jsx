@@ -24,7 +24,7 @@ export default function Auth({ onLogin }) {
     }
   };
 
-  // ✅ New helper to detect Enter key
+  //Helper to detect Enter key
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleAction(false); // Default to Login on Enter

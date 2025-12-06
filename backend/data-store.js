@@ -1,4 +1,3 @@
-// backend/data-store.js
 const mongoose = require('mongoose');
 
 // 1. Define the User Schema

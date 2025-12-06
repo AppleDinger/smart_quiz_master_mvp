@@ -5,8 +5,7 @@
 ## [Live Demo Link](https://appledinger.github.io/smart_quiz_master_mvp/) 🔗
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400.png?text=Smart+Quiz+Master+Demo+GIF" alt="Smart Quiz Demo" width="100%" />
-  <br>
+<img src="./assets/project1img1.png" alt="Dashboard Screenshot" width="100%" />  <br>
 </div>
 
 <br/>
@@ -28,7 +27,22 @@
 
 ## Features
 
-- ### **AI-Powered Generation 🤖** - ### **PDF & Document Analysis 📄** - ### **Global Leaderboard System 🏆** - ### **Real-Time Skill Tracking 📊** - ### **Responsive & Mobile Friendly 📱** - ### **Secure Backend Architecture 🔐** - ### **YouTube Transcript Parsing 📺** <img src="https://via.placeholder.com/800x400.png?text=Dashboard+Screenshot" alt="Smart Quiz Dashboard" width="100%" />
+- ### **AI-Powered Generation 🤖**
+- ### **PDF & Document Analysis 📄**
+- ### **Global Leaderboard System 🏆**
+- ### **Real-Time Skill Tracking 📊**
+- ### **Responsive & Mobile Friendly 📱**
+- ### **Secure Backend Architecture 🔐**
+- ### **YouTube Transcript Parsing 📺**
+
+<br/>
+
+<div align="center">
+<img src="./assets/project1img2.png" alt="Dashboard Screenshot" width="100%" />
+<img src="./assets/project1img3.png" alt="Leaderboard Screenshot" width="100%" />
+
+
+</div>
 
 <br/>
 <br/>
@@ -38,7 +52,7 @@
 ## [Live App Link](https://appledinger.github.io/smart_quiz_master_mvp/) 🔗
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400.png?text=Quiz+Taking+Animation" alt="Quiz Animation" width="100%" />
+  <img src="https://via.placeholder.com/800x400.png?text=Quiz+Interface+Screenshot" alt="Quiz Screenshot" width="100%" />
   <br>
 </div>
 
@@ -70,8 +84,6 @@ $ git clone [https://github.com/AppleDinger/smart_quiz_master_mvp.git](https://g
 
 # Go into the repository
 $ cd smart_quiz_master_mvp
-
-```
 
 
 Step 1: Setup Backend

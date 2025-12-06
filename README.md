@@ -52,7 +52,7 @@
 ## [Live App Link](https://appledinger.github.io/smart_quiz_master_mvp/) 🔗
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400.png?text=Quiz+Interface+Screenshot" alt="Quiz Screenshot" width="100%" />
+<img src="./assets/project1img4.png" alt="Quiz Screenshot" width="100%" />
   <br>
 </div>
 
